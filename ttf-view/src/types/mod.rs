@@ -18,13 +18,14 @@ pub type Offset32 = uint32;
 mod longdatetime;
 mod tag;
 mod uint24mod;
-// TODO: Version16Dot16
+mod version16dot16;
 // TODO: Fixed
 // TODO: F2DOT14
 
 pub use longdatetime::*;
 pub use tag::*;
 pub use uint24mod::*;
+pub use version16dot16::*;
 
 // Utility macro for formatting wrapper types, like uint24
 macro_rules! impl_fmt_from_getter {
