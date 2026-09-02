@@ -6,6 +6,8 @@ use std::{fmt, num::ParseIntError};
 pub struct Version16Dot16([u8; 4]);
 
 impl Version16Dot16 {
+    pub const V1_0: Self = Self::new(1, 0).unwrap();
+
     pub const fn new(major: u16, minor: u8) -> Option<Self> {
         if minor <= 9 { Some(unsafe { Self::new_unchecked(major, minor) }) } else { None }
     }

@@ -14,6 +14,7 @@ pub mod maxp;
 pub mod name;
 
 #[repr(C)]
+#[non_exhaustive]
 pub struct TableDirectoryRepr {
     table_data: [u8; 0],
     pub sfnt_version: uint32,
