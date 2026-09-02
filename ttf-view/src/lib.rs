@@ -7,6 +7,7 @@
 #![feature(const_cmp)]
 #![feature(const_try)]
 #![feature(derive_const)]
+#![feature(try_trait_v2)]
 #![allow(clippy::missing_safety_doc)] // TODO: remove when adding docs
 
 pub mod tables;
