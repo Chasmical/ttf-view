@@ -4,6 +4,7 @@
 #![feature(const_convert)]
 #![feature(const_default)]
 #![feature(const_clone)]
+#![feature(const_index)]
 #![feature(const_cmp)]
 #![feature(const_try)]
 #![feature(derive_const)]
