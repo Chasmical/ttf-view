@@ -58,11 +58,3 @@ impl CmapSubtableRepr {
         unsafe { std::slice::from_raw_parts(self.data.as_ptr(), self.length.get() as _) }
     }
 }
-
-pub trait CmapSubtable {
-    type Iter<'a>: Iterator<Item = (Codepoint, GlyphId)>
-    where Self: 'a;
-    fn glyph_id(&self, codepoint: Codepoint) -> Option<GlyphId>;
-    fn codepoint(&self, glyph_id: GlyphId) -> Option<Codepoint>;
-    fn iter(&self) -> Self::Iter<'_>;
-}
