@@ -8,14 +8,22 @@ keywords = []
 categories = []
 repository = "https://github.com/Chasmical/ttf-view"
 license = "MIT OR Apache-2.0"
-readme = "../../README.md"
+readme = "../README.md"
 
 [dependencies]
 chrono = "0.4.45"
 encoding_rs = { version = "0.8.35", optional = true }
+termal = { version = "5.1.1", optional = true }
 thiserror = "2.0.20"
 zerocopy = "0.8.56"
 
 [features]
 default = ["non-standard-encodings"]
 non-standard-encodings = ["dep:encoding_rs"]
+
+# Feature to enable ttf-view CLI app's dependencies
+cli = ["dep:termal"]
+
+[[bin]]
+name = "ttf-view"
+required-features = ["cli"]

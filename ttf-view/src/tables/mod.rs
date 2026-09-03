@@ -47,6 +47,9 @@ impl TableDirectoryRepr {
         let len = self.num_tables.get() as usize;
         unsafe { std::slice::from_raw_parts(self.table_records.as_ptr(), len) }
     }
+    pub fn table_record(&self, tag: Tag) -> Option<&TableRecordRepr> {
+        self.table_records().iter().find(|t| t.table_tag == tag)
+    }
 
     pub fn table<T: Table>(&self) -> Option<&T> {
         self.table_records().iter().find_map(|t| t.get_as::<T>(self))

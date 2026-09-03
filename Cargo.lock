@@ -18,6 +18,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
+name = "base64"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
+
+[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -50,6 +56,15 @@ dependencies = [
  "num-traits",
  "wasm-bindgen",
  "windows-link",
+]
+
+[[package]]
+name = "convert_case"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baaaa0ecca5b51987b9423ccdc971514dd8b0bb7b4060b983d3664dad3f1f89f"
+dependencies = [
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -139,10 +154,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
+name = "litrs"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e4cf394bcd88ba72eb3b2862e21ef6458b0e1586654e213b0176e667bb9d19e"
+dependencies = [
+ "proc-macro2",
+]
+
+[[package]]
+name = "litrs"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
+dependencies = [
+ "proc-macro2",
+]
+
+[[package]]
 name = "log"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
+
+[[package]]
+name = "minlin"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3aa9a6450f8ee186c83f5de403413641b217b4a042a4ec0de199741ebd3acd80"
+dependencies = [
+ "place_macro",
+]
 
 [[package]]
 name = "num-traits"
@@ -164,6 +206,36 @@ name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
+
+[[package]]
+name = "place_macro"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7184a838ea957f4354ee4087632287e6422fae12206bf7375a7774a904cf503e"
+dependencies = [
+ "place_macro_proc",
+]
+
+[[package]]
+name = "place_macro_core"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47bab9e5b5e3d59dcb49b5e8249a52127ac631980c35d20163c7b755abeec2d0"
+dependencies = [
+ "convert_case",
+ "litrs 0.5.1",
+ "proc-macro2",
+]
+
+[[package]]
+name = "place_macro_proc"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b40c6f0f1f18e9ef6334fafeaf1579c88b4cfe2dda26215c1251f9af325dbf5c"
+dependencies = [
+ "place_macro_core",
+ "proc-macro2",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -224,6 +296,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "termal"
+version = "5.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c461f0aebec41a9a0f12263431798bd93a44d167d2193fac2843b1719085b8d"
+dependencies = [
+ "termal_core",
+ "termal_proc",
+]
+
+[[package]]
+name = "termal_core"
+version = "5.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a81a7156916576ed12a488deca15edcb1cbf8210354f3de072b48c9ce79f55b4"
+dependencies = [
+ "base64",
+ "litrs 1.0.0",
+ "minlin",
+ "place_macro",
+ "proc-macro2",
+ "thiserror",
+]
+
+[[package]]
+name = "termal_proc"
+version = "5.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f80f96b38c5a39ebc385c49c63cba75151f522fc51a49c6508fe16270dffcb25"
+dependencies = [
+ "termal_core",
+]
+
+[[package]]
 name = "thiserror"
 version = "2.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -249,6 +354,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "encoding_rs",
+ "termal",
  "thiserror",
  "zerocopy",
 ]
@@ -258,6 +364,12 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
 
 [[package]]
 name = "wasm-bindgen"
