@@ -34,7 +34,7 @@ impl MaxpTableRepr {
 
 impl std::fmt::Debug for MaxpTableRepr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut builder = f.debug_struct("MaxpTableRepr");
+        let mut builder = f.debug_struct("MaxpTable");
         builder.field("version", &self.version).field("num_glyphs", &self.num_glyphs.get());
 
         if let Some(v1) = self.v1_fields() {

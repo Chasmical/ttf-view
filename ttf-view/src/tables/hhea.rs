@@ -24,7 +24,7 @@ pub struct HheaTableRepr {
 
 impl std::fmt::Debug for HheaTableRepr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("HheaTableRepr")
+        f.debug_struct("HheaTable")
             .field("major_version", &self.major_version.get())
             .field("minor_version", &self.minor_version.get())
             .field("ascender", &self.ascender.get())

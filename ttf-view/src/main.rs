@@ -157,7 +157,7 @@ The project's GitHub repository: https://github.com/Chasmical/ttf-view
   <FONT>  Path to the OpenType font file to view (.ttf, .otf)
 
 {'bold u}Options:{'_}
-  {'bold}-f, --format{'_} <FORMAT>  The format to dump the table data in (possible values: dbg/debug, bin/binary)
+  {'bold}-f, --format{'_} <FORMAT>  The format to dump the table data in [possible values: dbg/debug, bin/binary]
   {'bold}-t, --table{'_} <TAG>      The table to dump (omit to dump the table directory)
   {'bold}    --list-tables{'_}      List all supported OpenType tables (binary format always works)
   {'bold}-h, --help{'_}             Print help
