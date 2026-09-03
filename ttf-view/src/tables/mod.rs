@@ -1,6 +1,10 @@
 use crate::{
     tables::{
-        cmap::CmapTableRepr, head::HeadTableRepr, hhea::HheaTableRepr, maxp::MaxpTableRepr,
+        cmap::CmapTableRepr,
+        head::HeadTableRepr,
+        hhea::HheaTableRepr,
+        hmtx::{HmtxTableHandle, HmtxTableRepr},
+        maxp::MaxpTableRepr,
         name::NameTableRepr,
     },
     types::{Offset32, Tag, tags, uint16, uint32},
@@ -10,6 +14,7 @@ use std::fmt;
 pub mod cmap;
 pub mod head;
 pub mod hhea;
+pub mod hmtx;
 pub mod maxp;
 pub mod name;
 
@@ -44,8 +49,7 @@ impl TableDirectoryRepr {
     }
 
     pub fn table<T: Table>(&self) -> Option<&T> {
-        let table = self.table_records().iter().find(|t| t.table_tag == T::TAG)?;
-        Some(unsafe { table.get_unchecked::<T>(self) })
+        self.table_records().iter().find_map(|t| t.get_as::<T>(self))
     }
 
     // Note: These are all required tables, so we'll panic on their absence.
@@ -57,6 +61,9 @@ impl TableDirectoryRepr {
     }
     pub fn hhea(&self) -> &HheaTableRepr {
         self.table().unwrap()
+    }
+    pub fn hmtx(&self) -> HmtxTableHandle<'_> {
+        HmtxTableHandle::new(self)
     }
     pub fn maxp(&self) -> &MaxpTableRepr {
         self.table().unwrap()
@@ -74,10 +81,10 @@ impl TableRecordRepr {
         }
     }
 
-    pub const fn get<'a, T: Table>(&'a self, dir: &'a TableDirectoryRepr) -> Option<&'a T> {
-        if self.table_tag == T::TAG { Some(unsafe { self.get_unchecked(dir) }) } else { None }
+    pub const fn get_as<'a, T: Table>(&'a self, dir: &'a TableDirectoryRepr) -> Option<&'a T> {
+        if self.table_tag == T::TAG { Some(unsafe { self.get_as_unchecked(dir) }) } else { None }
     }
-    pub const unsafe fn get_unchecked<'a, T: Table>(
+    pub const unsafe fn get_as_unchecked<'a, T: Table>(
         &'a self,
         dir: &'a TableDirectoryRepr,
     ) -> &'a T {
@@ -99,6 +106,7 @@ impl_table_trait! {
     tags::cmap => CmapTableRepr,
     tags::head => HeadTableRepr,
     tags::hhea => HheaTableRepr,
+    tags::hmtx => HmtxTableRepr,
     tags::maxp => MaxpTableRepr,
     tags::name => NameTableRepr,
 }
