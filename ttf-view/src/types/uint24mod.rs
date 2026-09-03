@@ -1,4 +1,4 @@
-use crate::types::impl_fmt_from_getter;
+use crate::util::impl_fmt_with;
 
 #[derive(Copy, Hash)]
 #[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -33,8 +33,9 @@ impl uint24 {
     }
 }
 
-impl_fmt_from_getter! {
-    Debug, Display, Binary, Octal, LowerHex, UpperHex, LowerExp, UpperExp for uint24
+impl_fmt_with! {
+    Debug, Display, Binary, Octal, LowerHex, UpperHex, LowerExp, UpperExp:
+    |this: &uint24, f| this.get().fmt(f)
 }
 
 // TODO: When [u8; 3]'s Default is constified, replace this impl with #[derive_const]

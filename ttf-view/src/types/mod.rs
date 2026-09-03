@@ -26,15 +26,3 @@ pub use longdatetime::*;
 pub use tag::*;
 pub use uint24mod::*;
 pub use version16dot16::*;
-
-// Utility macro for formatting wrapper types, like uint24
-macro_rules! impl_fmt_from_getter {
-    ($($Trait:ident),* for $Struct:ty) => ($(
-        impl std::fmt::$Trait for $Struct {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                std::fmt::$Trait::fmt(&self.get(), f)
-            }
-        }
-    )*);
-}
-pub(crate) use impl_fmt_from_getter;
