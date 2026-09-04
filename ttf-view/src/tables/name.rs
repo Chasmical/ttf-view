@@ -2,7 +2,7 @@ use crate::{
     platform::{EncodingError, EncodingId, PlatformId},
     types::{Offset16, uint16},
 };
-use std::{borrow::Cow, bstr::ByteStr, fmt};
+use std::{borrow::Cow, bstr::ByteStr};
 
 #[repr(C)]
 #[non_exhaustive]
@@ -13,10 +13,9 @@ pub struct NameTableRepr {
     pub storage_offset: Offset16,
     name_records: [NameRecordRepr; 0],
     // version ≥ 1:
-    // : lang_tag_count: uint16
-    // : lang_tag_records: [LangTagRecordRepr; lang_tag_count]
+    // : lang_tag_count: uint16,
+    // : lang_tag_records: [LangTagRecordRepr; lang_tag_count],
 }
-
 #[repr(C)]
 pub struct NameRecordRepr {
     pub platform_id: uint16,
@@ -26,7 +25,6 @@ pub struct NameRecordRepr {
     pub length: uint16,
     pub string_offset: Offset16,
 }
-
 #[repr(C)]
 pub struct LangTagRecordRepr {
     pub length: uint16,
@@ -37,19 +35,22 @@ impl NameTableRepr {
     pub const fn name_records(&self) -> &[NameRecordRepr] {
         unsafe { std::slice::from_raw_parts(self.name_records.as_ptr(), self.count.get() as _) }
     }
-
-    pub const fn lang_tag_count(&self) -> uint16 {
-        if self.version.get() == 0 {
-            return uint16::ZERO;
-        }
-        unsafe { *self.name_records().as_ptr_range().end.cast() }
+    pub const fn names(&self) -> NamesIter<'_> {
+        NamesIter::new(self)
     }
+
+    // Note: I decided not to include lang_tag_count() getter here, because we've already got
+    // not only a better higher-level API - lang_tags(), but also just lang_tag_records().
+
     pub const fn lang_tag_records(&self) -> &[LangTagRecordRepr] {
         if self.version.get() == 0 {
             return &[];
         }
         let len_ptr = self.name_records().as_ptr_range().end.cast::<uint16>();
         unsafe { std::slice::from_raw_parts(len_ptr.add(1).cast(), (*len_ptr).get() as _) }
+    }
+    pub const fn lang_tags(&self) -> LangTagsIter<'_> {
+        LangTagsIter::new(self)
     }
 
     pub const fn string_storage(&self) -> &StringStorage {
@@ -59,37 +60,99 @@ impl NameTableRepr {
 }
 
 #[non_exhaustive]
-pub struct StringStorage;
+pub struct StringStorage {}
 
 impl StringStorage {
     pub const fn as_ptr(&self) -> *const u8 {
         std::ptr::from_ref(self).cast()
     }
-    pub(crate) const unsafe fn get(&self, offset: uint16, length: uint16) -> &[u8] {
-        unsafe {
-            let start = self.as_ptr().add(offset.get() as _);
-            std::slice::from_raw_parts(start, length.get() as _)
-        }
+    pub(crate) const unsafe fn get(&self, offset: u16, length: u16) -> &[u8] {
+        unsafe { std::slice::from_raw_parts(self.as_ptr().add(offset as _), length as _) }
     }
 }
 
-impl LangTagRecordRepr {
-    pub const fn bytes<'a>(&'a self, storage: &'a StringStorage) -> &'a [u8] {
-        unsafe { storage.get(self.lang_tag_offset, self.length) }
+#[derive(Copy)]
+#[derive_const(Clone)]
+pub struct NameHandle<'a>(&'a NameTableRepr, &'a NameRecordRepr);
+
+#[derive(Copy)]
+#[derive_const(Clone)]
+pub struct LangTagHandle<'a>(&'a NameTableRepr, &'a LangTagRecordRepr);
+
+const impl std::ops::Deref for NameHandle<'_> {
+    type Target = NameRecordRepr;
+    fn deref(&self) -> &Self::Target {
+        self.1
     }
-    pub fn tag<'a>(&'a self, storage: &'a StringStorage) -> String {
+}
+const impl std::ops::Deref for LangTagHandle<'_> {
+    type Target = LangTagRecordRepr;
+    fn deref(&self) -> &Self::Target {
+        self.1
+    }
+}
+
+impl<'a> NameHandle<'a> {
+    pub const fn bytes(&self) -> &'a [u8] {
+        unsafe { self.0.string_storage().get(self.1.string_offset.get(), self.1.length.get()) }
+    }
+    pub fn string(&self) -> Result<String, EncodingError> {
+        let encoding = EncodingId::new(self.1.platform_id.get(), self.1.encoding_id.get())?;
+        encoding.decode_utf16be(self.bytes())
+    }
+}
+
+impl<'a> LangTagHandle<'a> {
+    pub const fn bytes(&self) -> &'a [u8] {
+        unsafe { self.0.string_storage().get(self.1.lang_tag_offset.get(), self.1.length.get()) }
+    }
+    pub fn string(&self) -> String {
         // Note: LangTags are always encoded in UTF-16BE.
-        String::from_utf16be_lossy(self.bytes(storage))
+        String::from_utf16be_lossy(self.bytes())
     }
 }
 
-impl NameRecordRepr {
-    pub const fn bytes<'a>(&'a self, storage: &'a StringStorage) -> &'a [u8] {
-        unsafe { storage.get(self.string_offset, self.length) }
+// TODO: When std::slice::Iter's Clone is constified, make the derive const
+#[derive(Clone)]
+pub struct NamesIter<'a> {
+    table: &'a NameTableRepr,
+    records: std::slice::Iter<'a, NameRecordRepr>,
+}
+impl<'a> NamesIter<'a> {
+    pub const fn new(table: &'a NameTableRepr) -> Self {
+        Self { table, records: table.name_records().iter() }
     }
-    pub fn string<'a>(&'a self, storage: &'a StringStorage) -> Result<String, EncodingError> {
-        let encoding = EncodingId::new(self.platform_id.get(), self.encoding_id.get())?;
-        encoding.decode_utf16be(self.bytes(storage))
+    // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
+    pub fn as_records(&self) -> &'a [NameRecordRepr] {
+        self.records.as_slice()
+    }
+}
+impl<'a> Iterator for NamesIter<'a> {
+    type Item = NameHandle<'a>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.records.next().map(|x| NameHandle(self.table, x))
+    }
+}
+
+// TODO: When std::slice::Iter's Clone is constified, make the derive const
+#[derive(Clone)]
+pub struct LangTagsIter<'a> {
+    table: &'a NameTableRepr,
+    records: std::slice::Iter<'a, LangTagRecordRepr>,
+}
+impl<'a> LangTagsIter<'a> {
+    pub const fn new(table: &'a NameTableRepr) -> Self {
+        Self { table, records: table.lang_tag_records().iter() }
+    }
+    // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
+    pub fn as_records(&self) -> &'a [LangTagRecordRepr] {
+        self.records.as_slice()
+    }
+}
+impl<'a> Iterator for LangTagsIter<'a> {
+    type Item = LangTagHandle<'a>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.records.next().map(|x| LangTagHandle(self.table, x))
     }
 }
 
@@ -101,19 +164,13 @@ impl std::fmt::Debug for NameTableRepr {
             .field("version", &self.version.get())
             .field("count", &self.count.get())
             .field_with("storage_offset", |f| write!(f, "{:#06X}", self.storage_offset))
-            .field_with("name_records", |f| {
-                let names = self.name_records().iter();
-                f.debug_list().entries(names.map(|x| NameRecordDebug(self, x))).finish()
-            });
+            .field_with("name_records", |f| f.debug_list().entries(self.names()).finish());
 
-        let lang_tags = self.lang_tag_records();
         if self.version.get() != 0 {
-            builder.field("lang_tag_count", &lang_tags.len());
+            builder.field("lang_tag_count", &self.lang_tag_records().len());
 
             builder.field_with("lang_tag_records", |f| {
-                f.debug_list()
-                    .entries(lang_tags.iter().map(|x| LangTagRecordDebug(self, x)))
-                    .finish()
+                f.debug_list().entries(self.lang_tags()).finish()
             });
         }
 
@@ -121,42 +178,33 @@ impl std::fmt::Debug for NameTableRepr {
     }
 }
 
-struct NameRecordDebug<'a>(&'a NameTableRepr, &'a NameRecordRepr);
+impl std::fmt::Debug for NameHandle<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let Self(name, rec) = *self;
 
-struct LangTagRecordDebug<'a>(&'a NameTableRepr, &'a LangTagRecordRepr);
+        let value = self.string().map_err(|err| (err, ByteStr::new(self.bytes())));
 
-impl<'a> fmt::Debug for NameRecordDebug<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self(name, record) = *self;
-        let str = name.string_storage();
+        let plat_id = PlatformId::new(rec.platform_id.get());
+        let plat_name = plat_id.map_or("Unknown", |x| x.name());
 
-        let value = record.string(str).map_err(|err| (err, ByteStr::new(record.bytes(str))));
+        let enc_id = plat_id.and_then(|x| x.encoding(rec.encoding_id.get()));
+        let enc_name = enc_id.map_or(Cow::Borrowed("Unknown"), |x| x.name());
 
-        let platform_id = PlatformId::new(record.platform_id.get());
-        let plat_name = platform_id.map_or("Unknown", |x| x.name());
-
-        let encoding_id = platform_id.and_then(|x| x.encoding(record.encoding_id.get()));
-        let enc_name = encoding_id.map_or(Cow::Borrowed("Unknown"), |x| x.name());
-
-        let language_id = platform_id.and_then(|x| x.language(record.language_id.get()));
-        let lang_name = language_id
-            .map(|x| match x.tag_ietf(Some(name)) {
-                Some(tag) => {
-                    let eng_name = x.english_name(Some(name)).unwrap_or(Cow::Borrowed("Unknown"));
-                    Cow::Owned(format!("{}: {}", tag, eng_name))
-                },
-                None => Cow::Borrowed("Unknown"),
-            })
-            .unwrap_or(Cow::Borrowed("Unknown"));
+        let lang_id = plat_id.and_then(|x| x.language(rec.language_id.get()));
+        let lang_name = format!(
+            "{}: {}",
+            lang_id.and_then(|x| x.tag(Some(name))).unwrap_or(Cow::Borrowed("und")),
+            lang_id.and_then(|x| x.english_name(Some(name))).unwrap_or(Cow::Borrowed("Unknown")),
+        );
 
         f.debug_struct("NameRecord")
-            .field_with("platform_id", |f| write!(f, "{} ({})", record.platform_id, plat_name))
-            .field_with("encoding_id", |f| write!(f, "{} ({})", record.encoding_id, enc_name))
-            .field_with("language_id", |f| write!(f, "{:#06X} ({})", record.language_id, lang_name))
+            .field_with("platform_id", |f| write!(f, "{} ({})", rec.platform_id, plat_name))
+            .field_with("encoding_id", |f| write!(f, "{} ({})", rec.encoding_id, enc_name))
+            .field_with("language_id", |f| write!(f, "{:#06X} ({})", rec.language_id, lang_name))
             // TODO: Parse name_id and display its name
-            .field("name_id", &record.name_id.get())
-            .field("length", &record.length.get())
-            .field_with("string_offset", |f| write!(f, "{:#06X}", record.string_offset))
+            .field("name_id", &rec.name_id.get())
+            .field("length", &rec.length.get())
+            .field_with("string_offset", |f| write!(f, "{:#06X}", rec.string_offset))
             .field_with("value", |f| {
                 let mut f = f.with_options(*f.options().alternate(false));
                 value.fmt(&mut f)
@@ -165,16 +213,16 @@ impl<'a> fmt::Debug for NameRecordDebug<'a> {
     }
 }
 
-impl<'a> fmt::Debug for LangTagRecordDebug<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self(name, record) = self;
+impl std::fmt::Debug for LangTagHandle<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let Self(_, rec) = *self;
 
         f.debug_struct("LangTagRecord")
-            .field("length", &record.length.get())
-            .field_with("lang_tag_offset", |f| write!(f, "{:#06X}", record.lang_tag_offset))
-            .field_with("tag", |f| {
+            .field("length", &rec.length.get())
+            .field_with("lang_tag_offset", |f| write!(f, "{:#06X}", rec.lang_tag_offset))
+            .field_with("value", |f| {
                 let mut f = f.with_options(*f.options().alternate(false));
-                record.tag(name.string_storage()).fmt(&mut f)
+                self.string().fmt(&mut f)
             })
             .finish()
     }

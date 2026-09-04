@@ -16,7 +16,14 @@ impl LanguageId {
         PlatformId::new(platform_id)?.language(language_id)
     }
 
-    pub const fn get(&self) -> u16 {
+    pub const fn platform_id(&self) -> Option<u16> {
+        match self {
+            Self::Tagged(_) => None,
+            Self::Macintosh(_) => Some(1),
+            Self::Windows(_) => Some(3),
+        }
+    }
+    pub const fn language_id(&self) -> u16 {
         match *self {
             Self::Tagged(x) => x,
             Self::Macintosh(x) => x,
@@ -24,39 +31,32 @@ impl LanguageId {
         }
     }
 
-    pub fn tag_ietf(&self, table: Option<&NameTableRepr>) -> Option<Cow<'static, str>> {
-        Some(match self {
+    pub fn tag(&self, table: Option<&NameTableRepr>) -> Option<Cow<'static, str>> {
+        Some(match *self {
             Self::Tagged(id) => {
-                let table = table?;
-                let lang_record = table.lang_tag_records().get((id & 0x7FFF) as usize)?;
-                Cow::Owned(lang_record.tag(table.string_storage()))
+                Cow::Owned(table?.lang_tags().nth((id & 0x7FFF) as usize)?.string())
             },
-            Self::Macintosh(id) => Cow::Borrowed(macintosh_language_tag(*id)?),
+            Self::Macintosh(id) => Cow::Borrowed(macintosh_language_tag(id)?),
 
-            Self::Windows(id) => {
-                let res = <&Lcid>::try_from(*id as u32);
-                match res {
-                    Ok(lcid) => Cow::Borrowed(lcid.name),
-                    Err(LcidLookupError::Reserved(_, tag)) => Cow::Borrowed(tag),
-                    Err(_) => return None,
-                }
+            Self::Windows(id) => match <&Lcid>::try_from(id as u32) {
+                Ok(lcid) => Cow::Borrowed(lcid.name),
+                Err(LcidLookupError::Reserved(_, tag)) => Cow::Borrowed(tag),
+                Err(_) => return None,
             },
         })
     }
 
     pub fn english_name(&self, table: Option<&NameTableRepr>) -> Option<Cow<'static, str>> {
-        Some(match self {
+        Some(match *self {
             Self::Tagged(id) => {
-                let table = table?;
-                let lang_record = table.lang_tag_records().get((id & 0x7FFF) as usize)?;
-                let lang_tag = lang_record.tag(table.string_storage());
+                let lang_tag = table?.lang_tags().nth((id & 0x7FFF) as usize)?.string();
                 let lcid: &Lcid = lang_tag.as_str().try_into().ok()?;
                 Cow::Borrowed(lcid.english_name)
             },
-            Self::Macintosh(id) => Cow::Borrowed(macintosh_language_name(*id)?),
+            Self::Macintosh(id) => Cow::Borrowed(macintosh_language_name(id)?),
 
             Self::Windows(id) => {
-                let lcid: &Lcid = (*id as u32).try_into().ok()?;
+                let lcid: &Lcid = (id as u32).try_into().ok()?;
                 Cow::Borrowed(lcid.english_name)
             },
         })
