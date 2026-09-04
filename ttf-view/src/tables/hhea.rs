@@ -1,4 +1,4 @@
-use crate::types::{FWORD, UFWORD, int16, uint16};
+use crate::types::{FWORD, Tag, UFWORD, int16, tags, uint16};
 
 #[repr(C)]
 pub struct HheaTableRepr {
@@ -20,6 +20,11 @@ pub struct HheaTableRepr {
     pub reserved3: int16,
     pub metric_data_format: int16,
     pub number_of_h_metrics: uint16,
+}
+
+impl super::Table for HheaTableRepr {
+    const TAG: Tag = tags::hhea;
+    type Handle<'a> = &'a Self;
 }
 
 impl std::fmt::Debug for HheaTableRepr {

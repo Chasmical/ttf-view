@@ -1,6 +1,6 @@
 use crate::{
-    tables::{TableDirectoryRepr, cmap::GlyphId},
-    types::{FWORD, UFWORD, int16},
+    tables::{TableDirectoryRepr, cmap::GlyphId, hhea::HheaTableRepr, maxp::MaxpTableRepr},
+    types::{FWORD, Tag, UFWORD, int16, tags},
 };
 use std::iter::FusedIterator;
 
@@ -10,14 +10,30 @@ pub struct HmtxTableRepr {
     // Note: It's a little bit faster to work with `&[FWORD]` than with separately typed slices.
     // See [`HmtxTableHandle::metric`] method for explanation.
     raw_metrics: [FWORD; 0],
-    // : h_metrics: [LongHorMetricRepr; num_h_metrics]
-    // : left_side_bearings: [FWORD; num_glyphs - num_h_metrics]
+    // : h_metrics: [LongHorMetricRepr; hhea().num_h_metrics],
+    // : left_side_bearings: [FWORD; maxp().num_glyphs - hhea().num_h_metrics],
 }
-
 #[repr(C)]
 pub struct LongHorMetricRepr {
     pub advance_width: UFWORD,
     pub lsb: FWORD,
+}
+
+impl super::Table for HmtxTableRepr {
+    const TAG: Tag = tags::hmtx;
+    type Handle<'a> = HmtxTableHandle<'a>;
+}
+impl<'a> super::TableHandle<'a> for HmtxTableHandle<'a> {
+    fn in_directory(dir: &'a TableDirectoryRepr) -> Option<Self> {
+        let raw_metrics = dir.table_raw::<HmtxTableRepr>()?.raw_metrics.as_ptr();
+        let num_h_metrics = dir.table::<HheaTableRepr>()?.number_of_h_metrics.get() as usize;
+        let num_glyphs = dir.table::<MaxpTableRepr>()?.num_glyphs.get() as usize;
+
+        let total_word_count = num_h_metrics + num_glyphs;
+        let raw_metrics = unsafe { std::slice::from_raw_parts(raw_metrics, total_word_count) };
+
+        Some(Self { raw_metrics, num_h_metrics })
+    }
 }
 
 // Note: HmtxTableRepr can't provide anything on its own. We need data from two other tables:
@@ -48,17 +64,6 @@ const impl From<&LongHorMetricRepr> for LongHorMetric {
 }
 
 impl<'a> HmtxTableHandle<'a> {
-    pub fn new(dir: &'a TableDirectoryRepr) -> Self {
-        let raw_metrics = dir.table::<HmtxTableRepr>().unwrap().raw_metrics.as_ptr();
-        let num_h_metrics = dir.hhea().number_of_h_metrics.get() as usize;
-        let num_glyphs = dir.maxp().num_glyphs.get() as usize;
-
-        let total_word_count = num_h_metrics + num_glyphs;
-        let raw_metrics = unsafe { std::slice::from_raw_parts(raw_metrics, total_word_count) };
-
-        Self { raw_metrics, num_h_metrics }
-    }
-
     pub const fn num_h_metrics(&self) -> u16 {
         self.num_h_metrics as u16
     }

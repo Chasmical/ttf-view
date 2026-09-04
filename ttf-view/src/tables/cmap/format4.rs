@@ -8,12 +8,12 @@ pub struct CmapSubtableFormat4Repr {
     pub entry_selector: uint16,
     pub range_shift: uint16,
     data: [uint16; 0],
-    // : end_code: [uint16; seg_count]
-    // : reserved_pad: uint16
-    // : start_code: [uint16; seg_count]
-    // : id_delta: [uint16; seg_count]
-    // : id_range_offset: [uint16; seg_count]
-    // : glyph_id_array: [uint16; arbitrary length]
+    // : end_code: [uint16; seg_count],
+    // : reserved_pad: uint16,
+    // : start_code: [uint16; seg_count],
+    // : id_delta: [uint16; seg_count],
+    // : id_range_offset: [uint16; seg_count],
+    // : glyph_id_array: [uint16; arbitrary length],
 }
 
 // TODO: 'cmap' subtable format 4

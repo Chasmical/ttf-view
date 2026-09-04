@@ -1,6 +1,6 @@
 use crate::{
     platform::{EncodingError, EncodingId, PlatformId},
-    types::{Offset16, uint16},
+    types::{Offset16, Tag, tags, uint16},
 };
 use std::{borrow::Cow, bstr::ByteStr};
 
@@ -29,6 +29,11 @@ pub struct NameRecordRepr {
 pub struct LangTagRecordRepr {
     pub length: uint16,
     pub lang_tag_offset: Offset16,
+}
+
+impl super::Table for NameTableRepr {
+    const TAG: Tag = tags::name;
+    type Handle<'a> = &'a Self;
 }
 
 impl NameTableRepr {
