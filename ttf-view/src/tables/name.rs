@@ -1,5 +1,5 @@
 use crate::{
-    encodings::{Encoding, EncodingError},
+    platform::{EncodingError, EncodingId, PlatformId},
     types::{Offset16, uint16},
 };
 use std::{borrow::Cow, bstr::ByteStr, fmt};
@@ -88,16 +88,13 @@ impl NameRecordRepr {
         unsafe { storage.get(self.string_offset, self.length) }
     }
     pub fn string<'a>(&'a self, storage: &'a StringStorage) -> Result<String, EncodingError> {
-        let encoding = Encoding::new(self.platform_id.get(), self.encoding_id.get());
+        let encoding = EncodingId::new(self.platform_id.get(), self.encoding_id.get())?;
         encoding.decode_utf16be(self.bytes(storage))
     }
 }
 
 impl std::fmt::Debug for NameTableRepr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let storage = self.string_storage();
-        let lang_tags = self.lang_tag_records();
-
         let mut builder = f.debug_struct("NameTable");
 
         builder
@@ -106,17 +103,16 @@ impl std::fmt::Debug for NameTableRepr {
             .field_with("storage_offset", |f| write!(f, "{:#06X}", self.storage_offset))
             .field_with("name_records", |f| {
                 let names = self.name_records().iter();
-                f.debug_list()
-                    .entries(names.map(|x| NameRecordDebug(x, storage, lang_tags)))
-                    .finish()
+                f.debug_list().entries(names.map(|x| NameRecordDebug(self, x))).finish()
             });
 
+        let lang_tags = self.lang_tag_records();
         if self.version.get() != 0 {
             builder.field("lang_tag_count", &lang_tags.len());
 
             builder.field_with("lang_tag_records", |f| {
                 f.debug_list()
-                    .entries(lang_tags.iter().map(|x| LangTagRecordDebug(x, storage)))
+                    .entries(lang_tags.iter().map(|x| LangTagRecordDebug(self, x)))
                     .finish()
             });
         }
@@ -125,28 +121,42 @@ impl std::fmt::Debug for NameTableRepr {
     }
 }
 
-struct NameRecordDebug<'a>(&'a NameRecordRepr, &'a StringStorage, &'a [LangTagRecordRepr]);
+struct NameRecordDebug<'a>(&'a NameTableRepr, &'a NameRecordRepr);
 
-struct LangTagRecordDebug<'a>(&'a LangTagRecordRepr, &'a StringStorage);
+struct LangTagRecordDebug<'a>(&'a NameTableRepr, &'a LangTagRecordRepr);
 
 impl<'a> fmt::Debug for NameRecordDebug<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self(name, storage, _lang_tags) = *self;
+        let Self(name, record) = *self;
+        let str = name.string_storage();
 
-        let enc = Encoding::new(name.platform_id.get(), name.encoding_id.get());
-        let enc_name = enc.encoding_name().unwrap_or(Cow::Borrowed("Unknown"));
+        let value = record.string(str).map_err(|err| (err, ByteStr::new(record.bytes(str))));
 
-        let value = name.string(storage).map_err(|_| ByteStr::new(name.bytes(storage)));
+        let platform_id = PlatformId::new(record.platform_id.get());
+        let plat_name = platform_id.map_or("Unknown", |x| x.name());
+
+        let encoding_id = platform_id.and_then(|x| x.encoding(record.encoding_id.get()));
+        let enc_name = encoding_id.map_or(Cow::Borrowed("Unknown"), |x| x.name());
+
+        let language_id = platform_id.and_then(|x| x.language(record.language_id.get()));
+        let lang_name = language_id
+            .map(|x| match x.tag_ietf(Some(name)) {
+                Some(tag) => {
+                    let eng_name = x.english_name(Some(name)).unwrap_or(Cow::Borrowed("Unknown"));
+                    Cow::Owned(format!("{}: {}", tag, eng_name))
+                },
+                None => Cow::Borrowed("Unknown"),
+            })
+            .unwrap_or(Cow::Borrowed("Unknown"));
 
         f.debug_struct("NameRecord")
-            .field("platform_id", &enc.platform_id())
-            .field_with("encoding_id", |f| write!(f, "{} ({})", name.encoding_id.get(), enc_name))
-            // TODO: Parse language_id as either a platform-specific id or a LangTag
-            .field_with("language_id", |f| write!(f, "{:#06X}", name.language_id))
+            .field_with("platform_id", |f| write!(f, "{} ({})", record.platform_id, plat_name))
+            .field_with("encoding_id", |f| write!(f, "{} ({})", record.encoding_id, enc_name))
+            .field_with("language_id", |f| write!(f, "{:#06X} ({})", record.language_id, lang_name))
             // TODO: Parse name_id and display its name
-            .field("name_id", &name.name_id.get())
-            .field("length", &name.length.get())
-            .field_with("string_offset", |f| write!(f, "{:#06X}", name.string_offset))
+            .field("name_id", &record.name_id.get())
+            .field("length", &record.length.get())
+            .field_with("string_offset", |f| write!(f, "{:#06X}", record.string_offset))
             .field_with("value", |f| {
                 let mut f = f.with_options(*f.options().alternate(false));
                 value.fmt(&mut f)
@@ -157,14 +167,14 @@ impl<'a> fmt::Debug for NameRecordDebug<'a> {
 
 impl<'a> fmt::Debug for LangTagRecordDebug<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Self(lang, storage) = self;
+        let Self(name, record) = self;
 
         f.debug_struct("LangTagRecord")
-            .field("length", &lang.length.get())
-            .field_with("lang_tag_offset", |f| write!(f, "{:#06X}", lang.lang_tag_offset))
+            .field("length", &record.length.get())
+            .field_with("lang_tag_offset", |f| write!(f, "{:#06X}", record.lang_tag_offset))
             .field_with("tag", |f| {
                 let mut f = f.with_options(*f.options().alternate(false));
-                lang.tag(storage).fmt(&mut f)
+                record.tag(name.string_storage()).fmt(&mut f)
             })
             .finish()
     }
