@@ -29,23 +29,23 @@ impl<'a, T: Table> TableHandle<'a> for &'a T {
 }
 
 impl TableDirectoryRepr {
-    // Note: These are all required tables, so we'll panic on their absence.
-    pub fn cmap(&self) -> &cmap::CmapTableRepr {
-        self.table::<cmap::CmapTableRepr>().unwrap()
+    // Note: Even though these tables are required, we'll still use Option here
+    pub fn cmap(&self) -> Option<&cmap::CmapTableRepr> {
+        self.table::<cmap::CmapTableRepr>()
     }
-    pub fn head(&self) -> &head::HeadTableRepr {
-        self.table::<head::HeadTableRepr>().unwrap()
+    pub fn head(&self) -> Option<&head::HeadTableRepr> {
+        self.table::<head::HeadTableRepr>()
     }
-    pub fn hhea(&self) -> &hhea::HheaTableRepr {
-        self.table::<hhea::HheaTableRepr>().unwrap()
+    pub fn hhea(&self) -> Option<&hhea::HheaTableRepr> {
+        self.table::<hhea::HheaTableRepr>()
     }
-    pub fn hmtx(&self) -> hmtx::HmtxTableHandle<'_> {
-        self.table::<hmtx::HmtxTableRepr>().unwrap()
+    pub fn hmtx(&self) -> Option<hmtx::HmtxTableHandle<'_>> {
+        self.table::<hmtx::HmtxTableRepr>()
     }
-    pub fn maxp(&self) -> &maxp::MaxpTableRepr {
-        self.table::<maxp::MaxpTableRepr>().unwrap()
+    pub fn maxp(&self) -> Option<&maxp::MaxpTableRepr> {
+        self.table::<maxp::MaxpTableRepr>()
     }
-    pub fn name(&self) -> &name::NameTableRepr {
-        self.table::<name::NameTableRepr>().unwrap()
+    pub fn name(&self) -> Option<&name::NameTableRepr> {
+        self.table::<name::NameTableRepr>()
     }
 }

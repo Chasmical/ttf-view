@@ -133,7 +133,7 @@ const DIR_TAG: Tag = if let Ok(tag) = Tag::from_str("dir") { tag } else { unreac
 
 // This macro constructs the dump() fn, and the supported formats table.
 macro_rules! implement_tables {
-    ($dir:ident { $( $tag:path, $name:expr, $get_table:expr => $Table:ty );* $(;)? }) => {
+    ($dir:ident { $( $tag:path, $name:expr $(, $get_table:expr => $Table:ty)? );* $(;)? }) => {
         fn dump($dir: &TableDirectoryRepr, tag: Option<Tag>, format: Format) {
             // Binary format should always work for any tables
             if format == Format::Binary {
@@ -151,10 +151,12 @@ macro_rules! implement_tables {
                 None => $dir,
                 Some(DIR_TAG) if $dir.table_record_raw(DIR_TAG).is_none() => $dir,
 
-                $(Some($tag) => $get_table,)*
+                $($( Some($tag) => &$get_table.unwrap(), )?)*
 
                 Some(table_tag @ _) => {
-                    if $dir.table_record_raw(table_tag).is_none() {
+                    if Tag::KNOWN_TAGS.contains(&table_tag) {
+                        error_exit!("OpenType table '{table_tag}' is not implemented yet");
+                    } else if $dir.table_record_raw(table_tag).is_none() {
                         error_exit!("Could not find a table with tag '{table_tag}'");
                     } else {
                         error_exit!("Unknown table '{table_tag}'. Consider exporting in binary format");
@@ -183,79 +185,79 @@ macro_rules! implement_tables {
         }
 
         // Construct a supported formats table for tables
-        struct Table {
-            tag: Tag,
+        struct TableSupport {
             name: &'static str,
-            // has_impl: bool,
+            tag: Tag,
             dbg: bool,
             json: bool,
             ttx: bool,
         }
-        const SUPPORTED_TABLES: &[Table] = &[
-            $(Table {
+        const SUPPORTED_TABLES: &[TableSupport] = &[
+            $(TableSupport {
                 tag: $tag, name: $name,
-                // has_impl: stringify!($Table) != "Todo",
-                dbg: std::any::TypeId::of::<$Table>().trait_info_of::<dyn Debug>().is_some(),
+                dbg: implement_tables!(@impls_trait $($Table)? : Debug),
                 json: false,
                 ttx: false,
             },)*
         ];
     };
+    (@impls_trait $Table:ty : $Trait:ident) => {
+        std::any::TypeId::of::<$Table>().trait_info_of::<dyn $Trait>().is_some()
+    };
+    (@impls_trait : $Trait:ty) => { false };
 }
 
-struct Todo;
-
 implement_tables!(dir {
-    tags::avar, "Axis Variations Table", &Todo => Todo; // dir.avar() => avar::AvarTableRepr;
-    tags::BASE, "Baseline Table", &Todo => Todo; // dir.base() => base::BaseTableRepr;
-    tags::CBDT, "Color Bitmap Data Table", &Todo => Todo; // dir.cbdt() => cbdt::CbdtTableRepr;
-    tags::CBLC, "Color Bitmap Location Table", &Todo => Todo; // dir.cblc() => cblc::CblcTableRepr;
-    tags::CFF , "Compact Font Format (Version 1)", &Todo => Todo; // dir.cff() => cff::CffTableRepr;
-    tags::CFF2, "Compact Font Format (Version 2)", &Todo => Todo; // dir.cff2() => cff2::Cff2TableRepr;
+    tags::avar, "Axis Variations Table"; // dir.avar() => avar::AvarTableRepr;
+    tags::BASE, "Baseline Table"; // dir.base() => base::BaseTableRepr;
+    tags::CBDT, "Color Bitmap Data Table"; // dir.cbdt() => cbdt::CbdtTableRepr;
+    tags::CBLC, "Color Bitmap Location Table"; // dir.cblc() => cblc::CblcTableRepr;
+    tags::CFF , "Compact Font Format (Version 1)"; // dir.cff() => cff::CffTableRepr;
+    tags::CFF2, "Compact Font Format (Version 2)"; // dir.cff2() => cff2::Cff2TableRepr;
     tags::cmap, "Character to Glyph Index Mapping", dir.cmap() => cmap::CmapTableRepr;
-    tags::COLR, "Color Table", &Todo => Todo; // dir.colr() => colr::ColrTableRepr;
-    tags::CPAL, "Color Palette Table", &Todo => Todo; // dir.cpal() => cpal::CpalTableRepr;
-    tags::cvar, "CVT Variations Table", &Todo => Todo; // dir.cvar() => cvar::cvarTableRepr;
-    tags::cvt , "Control Value Table", &Todo => Todo; // dir.cvt() => cvt::cvtTableRepr;
-    tags::DSIG, "Digital Signature Table", &Todo => Todo; // dir.dsig() => dsig::DsigTableRepr;
-    tags::EBDT, "Embedded Bitmap Data Table", &Todo => Todo; // dir.ebdt() => ebdt::EbdtTableRepr;
-    tags::EBLC, "Embedded Bitmap Location Table", &Todo => Todo; // dir.eblc() => eblc::EblcTableRepr;
-    tags::EBSC, "Embedded Bitmap Scaling Table", &Todo => Todo; // dir.ebsc() => ebsc::EbscTableRepr;
-    tags::fpgm, "Font Program", &Todo => Todo; // dir.fpgm() => fpgm::FpgmTableRepr;
-    tags::fvar, "Font Variations Table", &Todo => Todo; // dir.fvar() => fvar::FvarTableRepr;
-    tags::gasp, "Grid-fitting and Scan-conversion", &Todo => Todo; // dir.gasp() => gasp::GaspTableRepr;
-    tags::GDEF, "Glyph Definition Table", &Todo => Todo; // dir.gdef() => gdef::GdefTableRepr;
-    tags::glyf, "Glyph Data Table", &Todo => Todo; // dir.glyf() => glyf::GlyfTableRepr;
-    tags::GPOS, "Glyph Positioning Table", &Todo => Todo; // dir.gpos() => gpos::GposTableRepr;
-    tags::GSUB, "Glyph Substitution Table", &Todo => Todo; // dir.gsub() => gsub::GsubTableRepr;
-    tags::gvar, "Glyph Variations Table", &Todo => Todo; // dir.gvar() => gvar::GvarTableRepr;
-    tags::hdmx, "Horizontal Device Metrics", &Todo => Todo; // dir.hdmx() => hdmx::HdmxTableRepr;
+    tags::COLR, "Color Table"; // dir.colr() => colr::ColrTableRepr;
+    tags::CPAL, "Color Palette Table"; // dir.cpal() => cpal::CpalTableRepr;
+    tags::cvar, "CVT Variations Table"; // dir.cvar() => cvar::cvarTableRepr;
+    tags::cvt , "Control Value Table"; // dir.cvt() => cvt::cvtTableRepr;
+    tags::DSIG, "Digital Signature Table"; // dir.dsig() => dsig::DsigTableRepr;
+    tags::EBDT, "Embedded Bitmap Data Table"; // dir.ebdt() => ebdt::EbdtTableRepr;
+    tags::EBLC, "Embedded Bitmap Location Table"; // dir.eblc() => eblc::EblcTableRepr;
+    tags::EBSC, "Embedded Bitmap Scaling Table"; // dir.ebsc() => ebsc::EbscTableRepr;
+    tags::fpgm, "Font Program"; // dir.fpgm() => fpgm::FpgmTableRepr;
+    tags::fvar, "Font Variations Table"; // dir.fvar() => fvar::FvarTableRepr;
+    tags::gasp, "Grid-fitting and Scan-conversion"; // dir.gasp() => gasp::GaspTableRepr;
+    tags::GDEF, "Glyph Definition Table"; // dir.gdef() => gdef::GdefTableRepr;
+    tags::glyf, "Glyph Data Table"; // dir.glyf() => glyf::GlyfTableRepr;
+    tags::GPOS, "Glyph Positioning Table"; // dir.gpos() => gpos::GposTableRepr;
+    tags::GSUB, "Glyph Substitution Table"; // dir.gsub() => gsub::GsubTableRepr;
+    tags::gvar, "Glyph Variations Table"; // dir.gvar() => gvar::GvarTableRepr;
+    tags::hdmx, "Horizontal Device Metrics"; // dir.hdmx() => hdmx::HdmxTableRepr;
     tags::head, "Font Header Table", dir.head() => head::HeadTableRepr;
     tags::hhea, "Horizontal Header Table", dir.hhea() => hhea::HheaTableRepr;
-    tags::hmtx, "Horizontal Metrics Table", &dir.hmtx() => hmtx::HmtxTableHandle;
-    tags::HVAR, "Horizontal Metrics Variations Table", &Todo => Todo; // dir.hvar() => hvar::HvarTableRepr;
-    tags::JSTF, "Justification Table", &Todo => Todo; // dir.jstf() => jstf::JstfTableRepr;
-    tags::kern, "Kerning Table", &Todo => Todo; // dir.kern() => kern::KernTableRepr;
-    tags::loca, "Index to Location Table", &Todo => Todo; // dir.loca() => loca::LocaTableRepr;
-    tags::LTSH, "Linear Threshold Table", &Todo => Todo; // dir.ltsh() => ltsh::LtshTableRepr;
-    tags::MATH, "Mathematical Typesetting Table", &Todo => Todo; // dir.math() => math::MathTableRepr;
+    tags::hmtx, "Horizontal Metrics Table", dir.hmtx() => hmtx::HmtxTableHandle;
+    tags::HVAR, "Horizontal Metrics Variations Table"; // dir.hvar() => hvar::HvarTableRepr;
+    tags::JSTF, "Justification Table"; // dir.jstf() => jstf::JstfTableRepr;
+    tags::kern, "Kerning Table"; // dir.kern() => kern::KernTableRepr;
+    tags::loca, "Index to Location Table"; // dir.loca() => loca::LocaTableRepr;
+    tags::LTSH, "Linear Threshold Table"; // dir.ltsh() => ltsh::LtshTableRepr;
+    tags::MATH, "Mathematical Typesetting Table"; // dir.math() => math::MathTableRepr;
     tags::maxp, "Maximum Profile", dir.maxp() => maxp::MaxpTableRepr;
-    tags::MERG, "Merge Table", &Todo => Todo; // dir.merg() => merg::MergTableRepr;
-    tags::meta, "Metadata Table", &Todo => Todo; // dir.meta() => meta::MetaTableRepr;
-    tags::MVAR, "Metrics Variations Table", &Todo => Todo; // dir.mvar() => mvar::MvarTableRepr;
+    tags::MERG, "Merge Table"; // dir.merg() => merg::MergTableRepr;
+    tags::meta, "Metadata Table"; // dir.meta() => meta::MetaTableRepr;
+    tags::MVAR, "Metrics Variations Table"; // dir.mvar() => mvar::MvarTableRepr;
     tags::name, "Naming Table", dir.name() => name::NameTableRepr;
-    tags::OS_2, "OS/2 and Windows Metrics Table", &Todo => Todo; // dir.os_2() => os_2::Os_2TableRepr;
-    tags::PCLT, "PCL 5 Table", &Todo => Todo; // dir.pclt() => pclt::PcltTableRepr;
-    tags::post, "PostScript Table", &Todo => Todo; // dir.post() => post::PostTableRepr;
-    tags::prep, "Control Value Program", &Todo => Todo; // dir.prep() => prep::PrepTableRepr;
-    tags::sbix, "Standard Bitmap Graphics Table", &Todo => Todo; // dir.sbix() => sbix::SbixTableRepr;
-    tags::STAT, "Style Attributes Table", &Todo => Todo; // dir.stat() => stat::StatTableRepr;
-    tags::SVG , "Scalable Vector Graphics Table", &Todo => Todo; // dir.svg() => svg::SvgTableRepr;
-    tags::VDMX, "Vertical Device Metrics Table", &Todo => Todo; // dir.vdmx() => vdmx::VdmxTableRepr;
-    tags::vhea, "Vertical Header Table", &Todo => Todo; // dir.vhea() => vhea::VheaTableRepr;
-    tags::vmtx, "Vertical Metrics Table", &Todo => Todo; // dir.vmtx() => vmtx::VmtxTableRepr;
-    tags::VORG, "Vertical Origin Table", &Todo => Todo; // dir.vorg() => vorg::VorgTableRepr;
-    tags::VVAR, "Vertical Metrics Variations Table", &Todo => Todo; // dir.vvar() => vvar::VvarTableRepr;
+    tags::OS_2, "OS/2 and Windows Metrics Table"; // dir.os_2() => os_2::Os_2TableRepr;
+    tags::PCLT, "PCL 5 Table"; // dir.pclt() => pclt::PcltTableRepr;
+    tags::post, "PostScript Table"; // dir.post() => post::PostTableRepr;
+    tags::prep, "Control Value Program"; // dir.prep() => prep::PrepTableRepr;
+    tags::sbix, "Standard Bitmap Graphics Table"; // dir.sbix() => sbix::SbixTableRepr;
+    tags::STAT, "Style Attributes Table"; // dir.stat() => stat::StatTableRepr;
+    tags::SVG , "Scalable Vector Graphics Table"; // dir.svg() => svg::SvgTableRepr;
+    tags::VDMX, "Vertical Device Metrics Table"; // dir.vdmx() => vdmx::VdmxTableRepr;
+    tags::vhea, "Vertical Header Table"; // dir.vhea() => vhea::VheaTableRepr;
+    tags::vmtx, "Vertical Metrics Table"; // dir.vmtx() => vmtx::VmtxTableRepr;
+    tags::VORG, "Vertical Origin Table"; // dir.vorg() => vorg::VorgTableRepr;
+    tags::VVAR, "Vertical Metrics Variations Table"; // dir.vvar() => vvar::VvarTableRepr;
 });
 
 fn print_version() {
