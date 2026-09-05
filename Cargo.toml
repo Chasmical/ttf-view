@@ -1,3 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["ttf-view"]
+
+[profile.release]
+strip = true
+lto = true
