@@ -14,7 +14,6 @@
 #![feature(bstr)]
 #![feature(debug_closure_helpers)]
 #![feature(formatting_options)]
-#![feature(never_type)]
 #![feature(slice_from_ptr_range)]
 #![feature(try_trait_v2)]
 #![allow(clippy::missing_safety_doc)] // TODO: remove when adding docs

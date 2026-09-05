@@ -5,7 +5,7 @@ A TrueType/OpenType font parsing/viewing library and a CLI tool.
 ### Installation
 
 ```sh
-cargo install ttf-view -F cli
+cargo +nightly-2026-09-04 install ttf-view -F cli
 ```
 
 ### Usage examples
