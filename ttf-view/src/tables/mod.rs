@@ -31,21 +31,21 @@ impl<'a, T: Table> TableHandle<'a> for &'a T {
 impl TableDirectoryRepr {
     // Note: Even though these tables are required, we'll still use Option here
     pub fn cmap(&self) -> Option<&cmap::CmapTableRepr> {
-        self.table::<cmap::CmapTableRepr>()
+        self.table()
     }
     pub fn head(&self) -> Option<&head::HeadTableRepr> {
-        self.table::<head::HeadTableRepr>()
+        self.table()
     }
     pub fn hhea(&self) -> Option<&hhea::HheaTableRepr> {
-        self.table::<hhea::HheaTableRepr>()
+        self.table()
     }
     pub fn hmtx(&self) -> Option<hmtx::HmtxTableHandle<'_>> {
-        self.table::<hmtx::HmtxTableRepr>()
+        self.table()
     }
     pub fn maxp(&self) -> Option<&maxp::MaxpTableRepr> {
-        self.table::<maxp::MaxpTableRepr>()
+        self.table()
     }
     pub fn name(&self) -> Option<&name::NameTableRepr> {
-        self.table::<name::NameTableRepr>()
+        self.table()
     }
 }

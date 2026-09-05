@@ -1,5 +1,5 @@
 use crate::{
-    tables::Table,
+    tables::{Table, TableHandle},
     types::{Offset32, Tag, tags, uint16, uint32},
     util::iterator_map,
 };
@@ -51,7 +51,7 @@ impl TableDirectoryRepr {
     pub fn table_raw<T: Table>(&self) -> Option<&T> {
         self.table_record(T::TAG)?.table_as()
     }
-    pub fn table<T: Table>(&self) -> Option<T::Handle<'_>> {
+    pub fn table<'a, T: TableHandle<'a>>(&'a self) -> Option<T> {
         T::in_directory(self)
     }
 
