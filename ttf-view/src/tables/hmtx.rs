@@ -1,14 +1,14 @@
 use crate::{
     tables::{TableDirectoryRepr, cmap::GlyphId},
-    types::{FWORD, Tag, UFWORD, int16, tags},
+    types::{FWORD, Tag, UFWORD, tags},
 };
 
 #[repr(C)]
 #[non_exhaustive]
 pub struct HmtxTableRepr {
-    // Note: It's a little bit faster to work with `&[FWORD]` than with separately typed slices.
-    // See [`HmtxTableHandle::metric`] method for explanation.
-    raw_metrics: [FWORD; 0],
+    /// Note: It's a little bit faster to work with `&[FWORD]` than with separately typed slices.
+    /// See [`HmtxTableHandle::metric`] method for explanation.
+    raw_words: [FWORD; 0],
     // : h_metrics: [LongHorMetricRepr; hhea().num_h_metrics],
     // : left_side_bearings: [FWORD; maxp().num_glyphs - hhea().num_h_metrics],
 }
@@ -24,14 +24,14 @@ impl super::Table for HmtxTableRepr {
 }
 impl<'a> super::TableHandle<'a> for HmtxTableHandle<'a> {
     fn in_directory(dir: &'a TableDirectoryRepr) -> Option<Self> {
-        let raw_metrics = dir.table_raw::<HmtxTableRepr>()?.raw_metrics.as_ptr();
+        let raw_words = dir.table_raw::<HmtxTableRepr>()?.raw_words.as_ptr();
         let num_h_metrics = dir.hhea()?.number_of_h_metrics.get() as usize;
         let num_glyphs = dir.maxp()?.num_glyphs.get() as usize;
 
         let total_word_count = num_h_metrics + num_glyphs;
-        let raw_metrics = unsafe { std::slice::from_raw_parts(raw_metrics, total_word_count) };
+        let raw_words = unsafe { std::slice::from_raw_parts(raw_words, total_word_count) };
 
-        Some(Self { raw_metrics, num_h_metrics })
+        Some(Self { raw_words, num_h_metrics })
     }
 }
 
@@ -40,7 +40,7 @@ impl<'a> super::TableHandle<'a> for HmtxTableHandle<'a> {
 #[derive(Copy)]
 #[derive_const(Clone)]
 pub struct HmtxTableHandle<'a> {
-    raw_metrics: &'a [FWORD],
+    raw_words: &'a [FWORD],
     num_h_metrics: usize,
 }
 
@@ -67,19 +67,11 @@ impl<'a> HmtxTableHandle<'a> {
         self.num_h_metrics as u16
     }
     pub const fn num_glyphs(&self) -> u16 {
-        (self.raw_metrics.len() - self.num_h_metrics) as u16
+        (self.raw_words.len() - self.num_h_metrics) as u16
     }
 
     const fn h_metrics(&self) -> &'a [LongHorMetricRepr] {
-        unsafe { std::slice::from_raw_parts(self.raw_metrics.as_ptr().cast(), self.num_h_metrics) }
-    }
-    const fn lsbs(&self) -> &'a [FWORD] {
-        unsafe {
-            std::slice::from_raw_parts(
-                self.raw_metrics.as_ptr().add(self.num_h_metrics * 2),
-                self.raw_metrics.len() - self.num_h_metrics * 2,
-            )
-        }
+        unsafe { std::slice::from_raw_parts(self.raw_words.as_ptr().cast(), self.num_h_metrics) }
     }
 
     pub const fn last_advance_width(&self) -> Option<u16> {
@@ -126,12 +118,12 @@ impl<'a> HmtxTableHandle<'a> {
 
         Some(LongHorMetric {
             // Do a bounds check on min+idx+1 to check if this glyph is even represented here
-            lsb: self.raw_metrics.get(min.wrapping_add(idx).wrapping_add(1))?.get(),
+            lsb: self.raw_words.get(min.wrapping_add(idx).wrapping_add(1))?.get(),
 
             aw: {
                 if self.num_h_metrics != 0 {
                     // Unless hcount is 0, min*2 is always in valid range
-                    unsafe { self.raw_metrics.get_unchecked(min.wrapping_mul(2)) }.get() as u16
+                    unsafe { self.raw_words.get_unchecked(min.wrapping_mul(2)) }.get() as u16
                 } else {
                     // Otherwise, return 0 as advance_width
                     0
@@ -164,18 +156,18 @@ const impl<'a> IntoIterator for &HmtxTableHandle<'a> {
 #[derive(Clone)]
 pub struct Iter<'a> {
     glyph_id: u16,
+    num_h_metrics: u16,
     default_aw: u16,
-    h_metrics: std::slice::Iter<'a, LongHorMetricRepr>,
-    lsbs: std::slice::Iter<'a, int16>,
+    raw_words: std::slice::Iter<'a, FWORD>,
 }
 
 impl<'a> Iter<'a> {
     pub const fn new(hmtx: HmtxTableHandle<'a>) -> Self {
         Self {
             glyph_id: 0,
+            num_h_metrics: hmtx.num_h_metrics(),
             default_aw: hmtx.last_advance_width().unwrap_or(0),
-            h_metrics: hmtx.h_metrics().iter(),
-            lsbs: hmtx.lsbs().iter(),
+            raw_words: hmtx.raw_words.iter(),
         }
     }
 }
@@ -184,46 +176,16 @@ impl Iterator for Iter<'_> {
     type Item = (GlyphId, LongHorMetric);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(h_metric) = self.h_metrics.next() {
-            let id = GlyphId::from(self.glyph_id);
-            self.glyph_id += 1;
-
-            Some((id, h_metric.into()))
-        } else if let Some(lsb) = self.lsbs.next() {
-            let id = GlyphId::from(self.glyph_id);
-            self.glyph_id += 1;
-
-            Some((id, LongHorMetric::new(self.default_aw, lsb.get())))
+        let aw = if self.glyph_id < self.num_h_metrics {
+            self.raw_words.next()?.get() as u16
         } else {
-            None
-        }
-    }
+            self.default_aw
+        };
+        let lsb = self.raw_words.next()?.get();
 
-    fn try_fold<B, F, R>(&mut self, mut init: B, mut f: F) -> R
-    where
-        Self: Sized,
-        F: FnMut(B, Self::Item) -> R,
-        R: std::ops::Try<Output = B>,
-    {
-        for h_metric in &mut self.h_metrics {
-            let id = GlyphId::from(self.glyph_id);
-            self.glyph_id += 1;
-            init = f(init, (id, h_metric.into()))?;
-        }
-        for lsb in &mut self.lsbs {
-            let id = GlyphId::from(self.glyph_id);
-            self.glyph_id += 1;
-            init = f(init, (id, LongHorMetric::new(self.default_aw, lsb.get())))?;
-        }
-
-        R::from_output(init)
-    }
-    fn fold<B, F>(mut self, init: B, mut f: F) -> B
-    where
-        Self: Sized,
-        F: FnMut(B, Self::Item) -> B,
-    {
-        self.try_fold(init, |init, x| Ok::<_, !>(f(init, x))).unwrap()
+        let id = GlyphId::new(self.glyph_id);
+        self.glyph_id += 1;
+        Some((id, LongHorMetric::new(aw, lsb)))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -233,7 +195,8 @@ impl Iterator for Iter<'_> {
 }
 impl ExactSizeIterator for Iter<'_> {
     fn len(&self) -> usize {
-        self.h_metrics.len() + self.lsbs.len()
+        let h_metrics_left = self.num_h_metrics.saturating_sub(self.glyph_id);
+        self.raw_words.len() - h_metrics_left as usize
     }
 }
 impl std::iter::FusedIterator for Iter<'_> {}
