@@ -1,6 +1,7 @@
 use crate::{
     platform::{EncodingError, EncodingId, PlatformId},
     types::{Offset16, Tag, tags, uint16},
+    util::iterator_map,
 };
 use std::{borrow::Cow, bstr::ByteStr};
 
@@ -121,45 +122,41 @@ impl<'a> LangTagHandle<'a> {
 #[derive(Clone)]
 pub struct NamesIter<'a> {
     table: &'a NameTableRepr,
-    records: std::slice::Iter<'a, NameRecordRepr>,
+    inner: std::slice::Iter<'a, NameRecordRepr>,
 }
 impl<'a> NamesIter<'a> {
     pub const fn new(table: &'a NameTableRepr) -> Self {
-        Self { table, records: table.name_records().iter() }
+        Self { table, inner: table.name_records().iter() }
     }
     // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
     pub fn as_records(&self) -> &'a [NameRecordRepr] {
-        self.records.as_slice()
+        self.inner.as_slice()
     }
 }
-impl<'a> Iterator for NamesIter<'a> {
+iterator_map!(NamesIter<'a> {
     type Item = NameHandle<'a>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.records.next().map(|x| NameHandle(self.table, x))
-    }
-}
+    |this, x| NameHandle(this.table, x)
+});
 
 // TODO: When std::slice::Iter's Clone is constified, make the derive const
 #[derive(Clone)]
 pub struct LangTagsIter<'a> {
     table: &'a NameTableRepr,
-    records: std::slice::Iter<'a, LangTagRecordRepr>,
+    inner: std::slice::Iter<'a, LangTagRecordRepr>,
 }
 impl<'a> LangTagsIter<'a> {
     pub const fn new(table: &'a NameTableRepr) -> Self {
-        Self { table, records: table.lang_tag_records().iter() }
+        Self { table, inner: table.lang_tag_records().iter() }
     }
     // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
     pub fn as_records(&self) -> &'a [LangTagRecordRepr] {
-        self.records.as_slice()
+        self.inner.as_slice()
     }
 }
-impl<'a> Iterator for LangTagsIter<'a> {
+iterator_map!(LangTagsIter<'a> {
     type Item = LangTagHandle<'a>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.records.next().map(|x| LangTagHandle(self.table, x))
-    }
-}
+    |this, x| LangTagHandle(this.table, x)
+});
 
 impl std::fmt::Debug for NameTableRepr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -172,11 +169,11 @@ impl std::fmt::Debug for NameTableRepr {
             .field_with("name_records", |f| f.debug_list().entries(self.names()).finish());
 
         if self.version.get() != 0 {
-            builder.field("lang_tag_count", &self.lang_tag_records().len());
-
-            builder.field_with("lang_tag_records", |f| {
-                f.debug_list().entries(self.lang_tags()).finish()
-            });
+            builder
+                .field("lang_tag_count", &self.lang_tag_records().len())
+                .field_with("lang_tag_records", |f| {
+                    f.debug_list().entries(self.lang_tags()).finish()
+                });
         }
 
         builder.finish()

@@ -1,5 +1,6 @@
 #![feature(const_trait_impl)]
 #![feature(const_result_trait_fn)]
+#![feature(const_slice_from_ptr_range)]
 #![feature(const_slice_make_iter)]
 #![feature(const_option_ops)]
 #![feature(const_convert)]
@@ -14,6 +15,7 @@
 #![feature(debug_closure_helpers)]
 #![feature(formatting_options)]
 #![feature(never_type)]
+#![feature(slice_from_ptr_range)]
 #![feature(try_trait_v2)]
 #![allow(clippy::missing_safety_doc)] // TODO: remove when adding docs
 

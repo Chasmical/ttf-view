@@ -27,6 +27,12 @@ impl TableDirectoryRepr {
         unsafe { &*bytes.as_ptr().cast() }
     }
 
+    pub const fn directory_as_bytes(&self) -> &[u8] {
+        let start = std::ptr::from_ref(self).cast();
+        let end = self.table_records_raw().as_ptr_range().end.cast();
+        unsafe { std::slice::from_ptr_range(start..end) }
+    }
+
     pub const fn table_records_raw(&self) -> &[TableRecordRepr] {
         let len = self.num_tables.get() as usize;
         unsafe { std::slice::from_raw_parts(self.table_records.as_ptr(), len) }
@@ -56,7 +62,7 @@ impl TableDirectoryRepr {
 #[derive_const(Clone)]
 pub struct TableRecordHandle<'a>(&'a TableDirectoryRepr, &'a TableRecordRepr);
 
-const impl<'a> std::ops::Deref for TableRecordHandle<'a> {
+const impl std::ops::Deref for TableRecordHandle<'_> {
     type Target = TableRecordRepr;
     fn deref(&self) -> &Self::Target {
         self.1
@@ -97,7 +103,7 @@ impl<'a> TableRecordHandle<'a> {
     }
 }
 
-// TODO: When std::slice::Iter's Clone is constified, replace this with #[derive_const]
+// TODO: When std::slice::Iter's Clone is constified, make the derive const
 #[derive(Clone)]
 pub struct TableRecordsIter<'a> {
     dir: &'a TableDirectoryRepr,
@@ -106,6 +112,10 @@ pub struct TableRecordsIter<'a> {
 impl<'a> TableRecordsIter<'a> {
     pub const fn new(dir: &'a TableDirectoryRepr) -> Self {
         Self { dir, inner: dir.table_records_raw().iter() }
+    }
+    // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
+    pub fn as_records(&self) -> &'a [TableRecordRepr] {
+        self.inner.as_slice()
     }
 }
 iterator_map!(TableRecordsIter<'a> {
@@ -142,5 +152,10 @@ impl std::fmt::Debug for TableRecordRepr {
             .field_with("offset", |f| write!(f, "{:#010X}", self.offset))
             .field_with("length", |f| write!(f, "{:#010X}", self.length))
             .finish()
+    }
+}
+impl std::fmt::Debug for TableRecordHandle<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        TableRecordRepr::fmt(self, f)
     }
 }

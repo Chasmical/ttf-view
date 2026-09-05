@@ -2,7 +2,6 @@ use crate::{
     tables::{TableDirectoryRepr, cmap::GlyphId, hhea::HheaTableRepr, maxp::MaxpTableRepr},
     types::{FWORD, Tag, UFWORD, int16, tags},
 };
-use std::iter::FusedIterator;
 
 #[repr(C)]
 #[non_exhaustive]
@@ -45,21 +44,21 @@ pub struct HmtxTableHandle<'a> {
     num_h_metrics: usize,
 }
 
-#[derive(Copy, Hash)]
+#[derive(Debug, Copy, Hash)]
 #[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LongHorMetric {
-    pub advance_width: u16,
+    pub aw: u16,
     pub lsb: i16,
 }
 
 impl LongHorMetric {
-    pub const fn new(advance_width: u16, lsb: i16) -> Self {
-        Self { advance_width, lsb }
+    pub const fn new(aw: u16, lsb: i16) -> Self {
+        Self { aw, lsb }
     }
 }
 const impl From<&LongHorMetricRepr> for LongHorMetric {
     fn from(value: &LongHorMetricRepr) -> Self {
-        Self { advance_width: value.advance_width.get(), lsb: value.lsb.get() }
+        Self { aw: value.advance_width.get(), lsb: value.lsb.get() }
     }
 }
 
@@ -129,7 +128,7 @@ impl<'a> HmtxTableHandle<'a> {
             // Do a bounds check on min+idx+1 to check if this glyph is even represented here
             lsb: self.raw_metrics.get(min.wrapping_add(idx).wrapping_add(1))?.get(),
 
-            advance_width: {
+            aw: {
                 if self.num_h_metrics != 0 {
                     // Unless hcount is 0, min*2 is always in valid range
                     unsafe { self.raw_metrics.get_unchecked(min.wrapping_mul(2)) }.get() as u16
@@ -141,7 +140,7 @@ impl<'a> HmtxTableHandle<'a> {
         })
     }
 
-    pub fn iter(&self) -> Iter<'_> {
+    pub const fn iter(&self) -> Iter<'_> {
         Iter::new(*self)
     }
 }
@@ -181,7 +180,7 @@ impl<'a> Iter<'a> {
     }
 }
 
-impl<'a> Iterator for Iter<'a> {
+impl Iterator for Iter<'_> {
     type Item = (GlyphId, LongHorMetric);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -232,9 +231,9 @@ impl<'a> Iterator for Iter<'a> {
         (len, Some(len))
     }
 }
-impl<'a> ExactSizeIterator for Iter<'a> {
+impl ExactSizeIterator for Iter<'_> {
     fn len(&self) -> usize {
         self.h_metrics.len() + self.lsbs.len()
     }
 }
-impl<'a> FusedIterator for Iter<'a> {}
+impl std::iter::FusedIterator for Iter<'_> {}
