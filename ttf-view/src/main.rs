@@ -154,7 +154,7 @@ macro_rules! implement_tables {
                 $($( Some($tag) => &$get_table.unwrap(), )?)*
 
                 Some(table_tag @ _) => {
-                    if Tag::KNOWN_TAGS.contains(&table_tag) {
+                    if table_tag.is_known() {
                         error_exit!("OpenType table '{table_tag}' is not implemented yet");
                     } else if $dir.table_record_raw(table_tag).is_none() {
                         error_exit!("Could not find a table with tag '{table_tag}'");

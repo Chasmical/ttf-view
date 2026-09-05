@@ -67,6 +67,10 @@ macro_rules! define_known_tags {
     ( $($tag:ident $(= $s:expr)?),* $(,)? ) => {
         impl Tag {
             pub const KNOWN_TAGS: &[Tag] = &[ $( tags::$tag, )* ];
+
+            pub const fn is_known(&self) -> bool {
+                matches!(*self, $( tags::$tag )|* )
+            }
         }
 
         #[allow(non_upper_case_globals)]
