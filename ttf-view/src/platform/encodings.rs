@@ -4,7 +4,7 @@ use std::borrow::Cow;
 #[cfg(feature = "non-standard-encodings")]
 use encoding_rs::{BIG5, EUC_KR, Encoding as EncodingRs, GB18030, SHIFT_JIS};
 
-#[derive(Copy, Hash)]
+#[derive(Debug, Copy, Hash)]
 #[derive_const(Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum EncodingId {

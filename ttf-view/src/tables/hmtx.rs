@@ -45,7 +45,7 @@ pub struct HmtxTableHandle<'a> {
 }
 
 #[derive(Debug, Copy, Hash)]
-#[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive_const(Clone, Default, PartialEq, Eq)]
 pub struct LongHorMetric {
     pub aw: u16,
     pub lsb: i16,

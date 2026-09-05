@@ -1,7 +1,7 @@
 use crate::util::impl_fmt_with;
 
 #[derive(Copy, Hash)]
-#[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive_const(Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Codepoint(u32);
 
 impl Codepoint {

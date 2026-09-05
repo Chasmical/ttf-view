@@ -2,7 +2,7 @@ use crate::{platform::PlatformId, tables::name::NameTableRepr};
 use lcid::{LanguageId as Lcid, LcidLookupError};
 use std::borrow::Cow;
 
-#[derive(Copy, Hash)]
+#[derive(Debug, Copy, Hash)]
 #[derive_const(Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum LanguageId {
