@@ -1,5 +1,10 @@
 use std::fmt;
 
+/// An [OpenType Tag][spec] consisting of 4 bytes in range `0x20..=0x7E`.
+///
+/// See constants for commonly used values in the [`tags`] module.
+///
+/// [spec]: https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types
 #[derive(Copy, Hash)]
 #[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
@@ -37,6 +42,17 @@ pub enum ParseTagError {
 }
 
 impl Tag {
+    /// Converts a 4 byte array to a valid tag. The bytes should be in `0x20..=0x7E` range.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ttf_view::types::{ParseTagError, Tag, tags};
+    ///
+    /// assert_eq!(Tag::from_bytes(*b"cmap"), Ok(tags::cmap));
+    /// assert_eq!(Tag::from_bytes(*b"SVG "), Ok(tags::SVG));
+    /// assert_eq!(Tag::from_bytes(*b"abc\0"), Err(ParseTagError::InvalidBytes));
+    /// ```
     pub const fn from_bytes(bytes: [u8; 4]) -> Result<Self, ParseTagError> {
         if matches!(bytes, [0x20..=0x7E, 0x20..=0x7E, 0x20..=0x7E, 0x20..=0x7E]) {
             Ok(Self(unsafe { std::mem::transmute::<[u8; 4], [TagByte; 4]>(bytes) }))
@@ -44,6 +60,21 @@ impl Tag {
             Err(ParseTagError::InvalidBytes)
         }
     }
+    /// Converts an ASCII string to a valid tag. The bytes should be in `0x20..=0x7E` range.
+    ///
+    /// This function parses 3-char strings as if the fourth byte is a space (`0x20`), allowing,
+    /// for example, `"SVG"` to be parsed as `SVG `.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ttf_view::types::{ParseTagError, Tag, tags};
+    ///
+    /// assert_eq!(Tag::from_str("hmtx"), Ok(tags::hmtx));
+    /// assert_eq!(Tag::from_str("SVG"), Ok(tags::SVG));
+    /// assert_eq!(Tag::from_str("not a tag"), Err(ParseTagError::InvalidLength));
+    /// assert_eq!(Tag::from_str(""), Err(ParseTagError::InvalidLength));
+    /// ```
     pub const fn from_str(s: &str) -> Result<Self, ParseTagError> {
         Self::from_bytes(match *s.as_bytes() {
             [a, b, c, d] => [a, b, c, d],
@@ -52,12 +83,45 @@ impl Tag {
         })
     }
 
+    /// Returns this tag as a 4 byte array.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ttf_view::types::tags;
+    ///
+    /// assert_eq!(tags::BASE.to_bytes(), [b'B', b'A', b'S', b'E']);
+    /// assert_eq!(tags::GSUB.to_bytes(), [b'G', b'S', b'U', b'B']);
+    /// assert_eq!(tags::CFF.to_bytes(), [b'C', b'F', b'F', b' ']);
+    /// ```
     pub const fn to_bytes(self) -> [u8; 4] {
         unsafe { std::mem::transmute(self.0) }
     }
+    /// Returns a reference to this tag's 4 byte array.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ttf_view::types::tags;
+    ///
+    /// assert_eq!(tags::cvt.as_bytes(), b"cvt ");
+    /// assert_eq!(tags::COLR.as_bytes(), b"COLR");
+    /// assert_eq!(tags::OS_2.as_bytes(), b"OS/2");
+    /// ```
     pub const fn as_bytes(&self) -> &[u8; 4] {
         unsafe { std::mem::transmute(&self.0) }
     }
+    /// Returns a reference to this tag's 4 byte array as a UTF-8 encoded string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ttf_view::types::tags;
+    ///
+    /// assert_eq!(tags::cvt.as_str(), "cvt ");
+    /// assert_eq!(tags::COLR.as_str(), "COLR");
+    /// assert_eq!(tags::OS_2.as_str(), "OS/2");
+    /// ```
     pub const fn as_str(&self) -> &str {
         unsafe { str::from_utf8_unchecked(self.as_bytes()) }
     }
@@ -66,8 +130,21 @@ impl Tag {
 macro_rules! define_known_tags {
     ( $($tag:ident $(= $s:expr)?),* $(,)? ) => {
         impl Tag {
+            /// An array of all known OpenType tags, collected from Microsoft's OpenType spec.
+            ///
+            /// Its contents and order may and probably will change in the future.
             pub const KNOWN_TAGS: &[Tag] = &[ $( tags::$tag, )* ];
 
+            /// Checks if this tag is a known OpenType tag ([`Tag::KNOWN_TAGS`]).
+            ///
+            /// ```
+            /// use ttf_view::types::{Tag, tags};
+            ///
+            /// // All tags in the `tags` module are known
+            /// assert_eq!(tags::name.is_known(), true);
+            /// assert_eq!(Tag::from_str("name").unwrap().is_known(), true);
+            /// assert_eq!(Tag::from_str("XXXX").unwrap().is_known(), false);
+            /// ```
             pub const fn is_known(&self) -> bool {
                 matches!(*self, $( tags::$tag )|* )
             }
@@ -91,6 +168,7 @@ define_known_tags! {
     vhea, vmtx, VORG, VVAR,
 }
 
+/// Formats the tag's value surrounded by apostrophes: e.g. `'COLR'`, `'cvt '`, `'glyf'`.
 impl fmt::Debug for Tag {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut buf = [b'\'', 0, 0, 0, 0, b'\''];
@@ -98,6 +176,7 @@ impl fmt::Debug for Tag {
         f.write_str(unsafe { str::from_utf8_unchecked(&buf) })
     }
 }
+/// Formats the tag's value as an unchanged string: e.g. `COLR`, `cvt `, `glyf`.
 impl fmt::Display for Tag {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.as_str().fmt(f)
