@@ -209,16 +209,28 @@ const impl Ord for LongDateTime {
     }
 }
 
-/// Formats [`LongDateTime`] as an RFC 3339 and ISO 8601 timestamp. [See more above](#formatting)
-impl std::fmt::Debug for LongDateTime {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        fmt_longdatetime(*self, true, f)
+const impl From<DateTime<Utc>> for LongDateTime {
+    fn from(value: DateTime<Utc>) -> Self {
+        Self::new(value)
     }
 }
+const impl TryFrom<LongDateTime> for DateTime<Utc> {
+    type Error = ();
+    fn try_from(value: LongDateTime) -> Result<Self, Self::Error> {
+        value.datetime().ok_or(())
+    }
+}
+
 /// Formats [`LongDateTime`] as a human-readable timestamp. [See more above](#formatting)
 impl std::fmt::Display for LongDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         fmt_longdatetime(*self, false, f)
+    }
+}
+/// Formats [`LongDateTime`] as an RFC 3339 and ISO 8601 timestamp. [See more above](#formatting)
+impl std::fmt::Debug for LongDateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fmt_longdatetime(*self, true, f)
     }
 }
 
@@ -290,18 +302,6 @@ fn ymd_from_days(unix_days: i64) -> (i64, u8, u8) {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     (y + (m <= 2) as i64, m as u8, d as u8)
-}
-
-const impl From<DateTime<Utc>> for LongDateTime {
-    fn from(value: DateTime<Utc>) -> Self {
-        Self::new(value)
-    }
-}
-const impl TryFrom<LongDateTime> for DateTime<Utc> {
-    type Error = ();
-    fn try_from(value: LongDateTime) -> Result<Self, Self::Error> {
-        value.datetime().ok_or(())
-    }
 }
 
 #[cfg(test)]
