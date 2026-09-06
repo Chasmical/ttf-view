@@ -1,5 +1,5 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeDelta, Utc};
-use std::fmt;
+use std::fmt::Write;
 
 #[derive(Copy, Hash)]
 #[derive_const(Clone, PartialEq, Eq)]
@@ -55,14 +55,51 @@ const impl Ord for LongDateTime {
     }
 }
 
-impl fmt::Debug for LongDateTime {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.datetime() {
-            Some(datetime) => datetime.fmt(f),
-            // TODO: maybe try to represent the out-of-range date?
-            None => write!(f, "{:#010X}", self.epoch_seconds()),
-        }
+impl std::fmt::Debug for LongDateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
     }
+}
+impl std::fmt::Display for LongDateTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let epoch_secs = self.epoch_seconds();
+
+        const SECS_PER_DAY: i64 = 24 * 60 * 60;
+        let epoch_days = epoch_secs.div_euclid(SECS_PER_DAY);
+        let epoch_secs = epoch_secs.rem_euclid(SECS_PER_DAY);
+
+        // Convert "days since 1904" to "days since 1970"
+        let (year, month, day) = ymd_from_days(epoch_days - 24107);
+
+        let hour = epoch_secs / 3600;
+        let min = (epoch_secs % 3600) / 60;
+        let sec = epoch_secs % 60;
+
+        if year > 9999 {
+            // ISO 8601 requires the explicit sign for out-of-range years
+            f.write_char('+')?;
+        } else if year < 0 {
+            // Write minus separately to avoid counting it towards min width in "{:04}"
+            f.write_char('-')?;
+        }
+
+        let year = year.unsigned_abs();
+        write!(f, "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", year, month, day, hour, min, sec)
+    }
+}
+
+fn ymd_from_days(unix_days: i64) -> (i64, u8, u8) {
+    // See https://howardhinnant.github.io/date_algorithms.html#civil_from_days
+    let z = unix_days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    (y + (m <= 2) as i64, m as u8, d as u8)
 }
 
 const impl From<DateTime<Utc>> for LongDateTime {
@@ -74,5 +111,43 @@ const impl TryFrom<LongDateTime> for DateTime<Utc> {
     type Error = ();
     fn try_from(value: LongDateTime) -> Result<Self, Self::Error> {
         value.datetime().ok_or(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn longdatetimes() {
+        let dates: [(u64, &'static str); _] = [
+            (0x8000000000000000, "-292277022723-01-25T08:29:52Z"),
+            (0xFFFFF00000000000, "-555571-10-24T14:19:44Z"),
+            (0xFFFFFF0000000000, "-32939-11-10T23:23:44Z"),
+            (0xFFFFFFF000000000, "-0274-05-13T16:27:44Z"),
+            (0xFFFFFFF200D00100, "-0001-01-01T00:00:00Z"),
+            (0xFFFFFFF202B13480, "0000-01-01T00:00:00Z"),
+            (0xFFFFFFF20493B980, "0001-01-01T00:00:00Z"),
+            (0x0000000000000000, "1904-01-01T00:00:00Z"),
+            (0x00000000E3D1B1DE, "2025-02-12T02:03:10Z"),
+            (0x00000000E6B686E6, "2026-08-28T00:29:26Z"),
+            (0x00000000FFFFFFFF, "2040-02-06T06:28:15Z"),
+            (0x000000FFFFFFFFFF, "+36746-02-19T00:36:15Z"),
+            (0x0000FFFFFFFFFFFF, "+8921490-12-06T10:44:15Z"),
+            (0x00FFFFFFFFFFFFFF, "+2283416158-11-23T12:52:15Z"),
+            (0x7FFFFFFFFFFFFFFF, "+292277026530-12-04T15:30:07Z"),
+        ];
+
+        assert_eq!(format!("{:?}", DateTime::<Utc>::MAX_UTC), "");
+
+        for (stamp, iso_date) in dates {
+            let stamp = LongDateTime::from_epoch_seconds(stamp as i64);
+            assert_eq!(format!("{:?}", stamp), iso_date);
+
+            if let Some(chrono_date) = stamp.datetime() {
+                assert_eq!(format!("{:?}", chrono_date), iso_date);
+                assert_eq!(stamp, LongDateTime::new(chrono_date));
+            }
+        }
     }
 }
