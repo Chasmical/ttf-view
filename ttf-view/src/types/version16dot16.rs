@@ -170,13 +170,17 @@ impl fmt::UpperHex for Version16Dot16 {
     }
 }
 
+/// Error type for parsing [`Version16Dot16`].
 // TODO: When ParseIntError's Clone + PartialEq + Eq are constified, make derives const
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ParseVersion16Dot16Error {
+    /// The string doesn't contain a dot `.`.
     #[error("dot not found in string")]
     NoDot,
+    /// The minor version is not in 0..=9 range.
     #[error("minor version is not in 0..=9 range")]
     Invalid,
+    /// Could not parse major/minor version component.
     #[error("number parsing error: {0}")]
     Number(ParseIntError),
 }
