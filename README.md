@@ -14,13 +14,13 @@ You can also find an already compiled exe for Windows x86_64 in [Releases](https
 
 ## Usage examples
 
-<img src="img/ttf-view-help.png" alt="ttf-view --help" width="580" height="346" />
+<img src="https://raw.githubusercontent.com/Chasmical/ttf-view/f2493f3c37171fb0ab950945f3c75f9da28385d0/img/ttf-view-help.png" alt="ttf-view --help" width="580" height="346" />
 
-<img src="img/ttf-view-list-tables.png" alt="ttf-view --list-tables" width="580" height="205" />
+<img src="https://raw.githubusercontent.com/Chasmical/ttf-view/f2493f3c37171fb0ab950945f3c75f9da28385d0/img/ttf-view-list-tables.png" alt="ttf-view --list-tables" width="580" height="205" />
 
-<img src="img/ttf-view-list-tables-2.png" alt="ttf-view test.ttf --list-tables" width="580" height="493" />
+<img src="https://raw.githubusercontent.com/Chasmical/ttf-view/f2493f3c37171fb0ab950945f3c75f9da28385d0/img/ttf-view-list-tables-2.png" alt="ttf-view test.ttf --list-tables" width="580" height="493" />
 
-<img src="img/ttf-view-table-head.png" alt="ttf-view test.ttf -t head" width="580" height="371" />
+<img src="https://raw.githubusercontent.com/Chasmical/ttf-view/f2493f3c37171fb0ab950945f3c75f9da28385d0/img/ttf-view-table-head.png" alt="ttf-view test.ttf -t head" width="580" height="371" />
 
 ## License
 
