@@ -2,6 +2,50 @@ use crate::util::DisplayBuffer;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeDelta, Utc};
 use std::fmt::Write;
 
+/// The [OpenType LongDateTime][spec] type.
+///
+/// `LongDateTime` is stored as a number of seconds since `1904-01-01T00:00:00Z`, and covers a
+/// riduculously large range of dates, extending to 278 billions of years before the formation of
+/// the universe (~13.8 billion BCE), and into the far-far future.
+///
+/// ```text
+/// chrono crate:         -262_143-01-01 00:00:00 UTC ..=         +262_142-12-31 23:59:59 UTC
+/// LongDateTime: -292_277_022_723-01-25 08:29:52 UTC ..= +292_277_026_530-12-04 15:30:07 UTC
+/// ```
+///
+/// Needless to say, `LongDateTime`'s formatting as civil time probably won't be accurate for really
+/// far away dates, since the Earth did not spin before the universe came into existence, and also
+/// because this implementation does not account for variable length of day, which will likely grow
+/// more than tenfold before an overflow occurs (if the Earth is still somehow not destroyed).
+///
+/// # Formatting
+///
+/// `LongDateTime`'s formatting impls mirror those of [`chrono::DateTime`].
+///
+/// [`Display`][std::fmt::Display] formats `LongDateTime` as a human-readable timestamp.
+///
+/// ```
+/// use ttf_view::types::LongDateTime;
+///
+/// // You can also use .to_string()
+/// let dt = LongDateTime::from_epoch_seconds(-1535200423);
+/// assert_eq!(format!("{}", dt), "1855-05-08 11:26:17 UTC");
+/// let dt = LongDateTime::from_epoch_seconds(3478852446);
+/// assert_eq!(format!("{}", dt), "2014-03-28 11:54:06 UTC");
+/// ```
+///
+/// [`Debug`][std::fmt::Debug] formats `LongDateTime` as an RFC 3339 and ISO 8601 timestamp.
+///
+/// ```
+/// use ttf_view::types::LongDateTime;
+///
+/// let dt = LongDateTime::from_epoch_seconds(-1535200423);
+/// assert_eq!(format!("{:?}", dt), "1855-05-08T11:26:17Z");
+/// let dt = LongDateTime::from_epoch_seconds(3478852446);
+/// assert_eq!(format!("{:?}", dt), "2014-03-28T11:54:06Z");
+/// ```
+///
+/// [spec]: https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types
 #[derive(Copy, Hash)]
 #[derive_const(Clone, PartialEq, Eq)]
 #[repr(transparent)]
@@ -11,27 +55,136 @@ const EPOCH_NAIVE: NaiveDateTime =
     NaiveDate::from_ymd_opt(1904, 1, 1).unwrap().and_hms_opt(0, 0, 0).unwrap();
 
 impl LongDateTime {
+    /// The point of reference from which `LongDateTime` counts seconds.
+    ///
+    /// ```
+    /// # use ttf_view::types::LongDateTime;
+    /// assert_eq!(LongDateTime::EPOCH.to_string(), "1904-01-01 00:00:00 UTC");
+    /// ```
     pub const EPOCH: DateTime<Utc> = EPOCH_NAIVE.and_utc();
+    /// The smallest representable [`LongDateTime`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ttf_view::types::LongDateTime;
+    /// assert_eq!(LongDateTime::MIN.to_string(), "-292277022723-01-25 08:29:52 UTC");
+    /// ```
+    pub const MIN: Self = Self::from_epoch_seconds(i64::MIN);
+    /// The largest representable [`LongDateTime`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ttf_view::types::LongDateTime;
+    /// assert_eq!(LongDateTime::MAX.to_string(), "+292277026530-12-04 15:30:07 UTC");
+    /// ```
+    pub const MAX: Self = Self::from_epoch_seconds(i64::MAX);
 
+    /// Creates a [`LongDateTime`] from [`chrono::DateTime<Utc>`]. Truncates sub-seconds.
+    ///
+    /// Always succeeds, since `chrono::DateTime`'s range is a subset of `LongDateTime`'s.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use chrono::{DateTime, Utc};
+    /// use ttf_view::types::LongDateTime;
+    ///
+    /// let dt: DateTime<Utc> = "2026-09-06 11:11:36.562 UTC".parse().unwrap();
+    /// assert_eq!(LongDateTime::new(dt).to_string(), "2026-09-06 11:11:36 UTC");
+    /// ```
     pub const fn new(datetime: DateTime<Utc>) -> Self {
         let delta = datetime.naive_utc().signed_duration_since(EPOCH_NAIVE);
         Self::from_epoch_seconds(delta.num_seconds())
     }
+    /// Returns a [`chrono::DateTime<Utc>`] representing this [`LongDateTime`] value.
+    ///
+    /// Returns `None` if it's out of `chrono::DateTime`'s range.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use chrono::{DateTime, Utc};
+    /// use ttf_view::types::LongDateTime;
+    ///
+    /// let long = LongDateTime::from_epoch_seconds(0xFFFFFFFF);
+    /// assert_eq!(long.to_string(), "2040-02-06 06:28:15 UTC");
+    /// assert_eq!(long.datetime().unwrap().to_string(), "2040-02-06 06:28:15 UTC");
+    ///
+    /// // chrono::DateTime is limited to ±262000 years.
+    /// let long = LongDateTime::from_epoch_seconds(0xFFFFFFFFFFFFFF);
+    /// assert_eq!(long.to_string(), "+2283416158-11-23 12:52:15 UTC");
+    /// assert_eq!(long.datetime(), None);
+    /// ```
     pub const fn datetime(&self) -> Option<DateTime<Utc>> {
         let delta = TimeDelta::try_seconds(self.epoch_seconds())?;
         Some(EPOCH_NAIVE.checked_add_signed(delta)?.and_utc())
     }
 
+    /// Creates a [`LongDateTime`] from the number of seconds since [`EPOCH`][Self::EPOCH]
+    /// (`1904-01-01 00:00:00 UTC`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ttf_view::types::LongDateTime;
+    ///
+    /// assert_eq!(LongDateTime::from_epoch_seconds(-1535200423).to_string(), "1855-05-08 11:26:17 UTC");
+    /// assert_eq!(LongDateTime::from_epoch_seconds(3478852446).to_string(), "2014-03-28 11:54:06 UTC");
+    /// ```
     pub const fn from_epoch_seconds(secs: i64) -> Self {
         Self(i64::to_be_bytes(secs))
     }
+    /// Returns the number of seconds from [`EPOCH`][Self::EPOCH] (`1904-01-01 00:00:00 UTC`)
+    /// to this [`LongDateTime`]'s value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use chrono::{DateTime, Utc};
+    /// use ttf_view::types::LongDateTime;
+    ///
+    /// let dt: DateTime<Utc> = "1855-05-08 11:26:17 UTC".parse().unwrap();
+    /// assert_eq!(LongDateTime::new(dt).epoch_seconds(), -1535200423);
+    /// let dt: DateTime<Utc> = "2014-03-28 11:54:06 UTC".parse().unwrap();
+    /// assert_eq!(LongDateTime::new(dt).epoch_seconds(), 3478852446);
+    /// ```
     pub const fn epoch_seconds(&self) -> i64 {
         i64::from_be_bytes(self.0)
     }
 
+    /// Creates a [`LongDateTime`] from big-endian bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ttf_view::types::LongDateTime;
+    ///
+    /// let raw = [0xFF, 0xFF, 0xFF, 0xFF, 0xA4, 0x7E, 0xB3, 0x59];
+    /// assert_eq!(LongDateTime::from_be_bytes(raw).to_string(), "1855-05-08 11:26:17 UTC");
+    /// let raw = [0x00, 0x00, 0x00, 0x00, 0xCF, 0x5B, 0x13, 0x5E];
+    /// assert_eq!(LongDateTime::from_be_bytes(raw).to_string(), "2014-03-28 11:54:06 UTC");
+    /// ```
     pub const fn from_be_bytes(bytes: [u8; 8]) -> Self {
         Self(bytes)
     }
+    /// Returns this [`LongDateTime`]'s big-endian bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use chrono::{DateTime, Utc};
+    /// use ttf_view::types::LongDateTime;
+    ///
+    /// let dt: DateTime<Utc> = "1855-05-08 11:26:17 UTC".parse().unwrap();
+    /// let raw = [0xFF, 0xFF, 0xFF, 0xFF, 0xA4, 0x7E, 0xB3, 0x59];
+    /// assert_eq!(LongDateTime::new(dt).to_be_bytes(), raw);
+    ///
+    /// let dt: DateTime<Utc> = "2014-03-28 11:54:06 UTC".parse().unwrap();
+    /// let raw = [0x00, 0x00, 0x00, 0x00, 0xCF, 0x5B, 0x13, 0x5E];
+    /// assert_eq!(LongDateTime::new(dt).to_be_bytes(), raw);
+    /// ```
     pub const fn to_be_bytes(self) -> [u8; 8] {
         self.0
     }
@@ -56,11 +209,13 @@ const impl Ord for LongDateTime {
     }
 }
 
+/// Formats [`LongDateTime`] as an RFC 3339 and ISO 8601 timestamp. [See more above](#formatting)
 impl std::fmt::Debug for LongDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         fmt_longdatetime(*self, true, f)
     }
 }
+/// Formats [`LongDateTime`] as a human-readable timestamp. [See more above](#formatting)
 impl std::fmt::Display for LongDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         fmt_longdatetime(*self, false, f)
