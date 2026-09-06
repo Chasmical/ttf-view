@@ -1,5 +1,7 @@
+mod display_buffer;
 mod iter;
 
+pub(crate) use display_buffer::*;
 pub(crate) use iter::*;
 
 /// Utility macro for formatting wrapper types, like uint24, F2DOT14, GlyphId

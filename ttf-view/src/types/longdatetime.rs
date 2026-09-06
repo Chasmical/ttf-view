@@ -1,3 +1,4 @@
+use crate::util::DisplayBuffer;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeDelta, Utc};
 use std::fmt::Write;
 
@@ -57,35 +58,69 @@ const impl Ord for LongDateTime {
 
 impl std::fmt::Debug for LongDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        std::fmt::Display::fmt(self, f)
+        fmt_longdatetime(*self, true, f)
     }
 }
 impl std::fmt::Display for LongDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let epoch_secs = self.epoch_seconds();
-
-        const SECS_PER_DAY: i64 = 24 * 60 * 60;
-        let epoch_days = epoch_secs.div_euclid(SECS_PER_DAY);
-        let epoch_secs = epoch_secs.rem_euclid(SECS_PER_DAY);
-
-        // Convert "days since 1904" to "days since 1970"
-        let (year, month, day) = ymd_from_days(epoch_days - 24107);
-
-        let hour = epoch_secs / 3600;
-        let min = (epoch_secs % 3600) / 60;
-        let sec = epoch_secs % 60;
-
-        if year > 9999 {
-            // ISO 8601 requires the explicit sign for out-of-range years
-            f.write_char('+')?;
-        } else if year < 0 {
-            // Write minus separately to avoid counting it towards min width in "{:04}"
-            f.write_char('-')?;
-        }
-
-        let year = year.unsigned_abs();
-        write!(f, "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", year, month, day, hour, min, sec)
+        fmt_longdatetime(*self, false, f)
     }
+}
+
+fn fmt_longdatetime(ldt: LongDateTime, iso: bool, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    let epoch_secs = ldt.epoch_seconds();
+
+    const SECS_PER_DAY: i64 = 24 * 60 * 60;
+    let epoch_days = epoch_secs.div_euclid(SECS_PER_DAY);
+    let epoch_secs = epoch_secs.rem_euclid(SECS_PER_DAY);
+
+    // Convert "days since 1904" to "days since 1970"
+    let (year, month, day) = ymd_from_days(epoch_days - 24107);
+
+    // Max length is 32: "-292277022723-01-25 08:29:52 UTC"
+    let mut buf = DisplayBuffer::<32>::new();
+
+    if year > 9999 {
+        // ISO 8601 requires the explicit sign for out-of-range years
+        buf.write_byte_unchecked(b'+');
+    } else if year < 0 {
+        // Write minus separately to avoid counting it towards min width in "{:04}"
+        buf.write_byte_unchecked(b'-');
+    }
+    let year = year.unsigned_abs();
+
+    // Write "{:04}" with year (fast path for 0..=9999)
+    if matches!(year, 0..=9999) {
+        buf.write_two_digits_unchecked((year / 100) as u8);
+        buf.write_two_digits_unchecked((year % 100) as u8);
+    } else {
+        write!(buf, "{:04}", year)?;
+    }
+
+    // Write "-{:02}-{:02}" with month and day
+    buf.write_byte_unchecked(b'-');
+    buf.write_two_digits_unchecked(month);
+    buf.write_byte_unchecked(b'-');
+    buf.write_two_digits_unchecked(day);
+
+    // In Debug use 'T' as separator, and in Display - ' '
+    buf.write_byte_unchecked(if iso { b'T' } else { b' ' });
+
+    // Write "{:02}:{:02}:{:02}" with hour, min, sec
+    buf.write_two_digits_unchecked((epoch_secs / 3600) as u8);
+    buf.write_byte_unchecked(b':');
+    buf.write_two_digits_unchecked(((epoch_secs % 3600) / 60) as u8);
+    buf.write_byte_unchecked(b':');
+    buf.write_two_digits_unchecked((epoch_secs % 60) as u8);
+
+    // In Debug use 'Z' for UTC, and in Display - " UTC"
+    if iso {
+        buf.write_byte_unchecked(b'Z');
+    } else {
+        buf.write_str_unchecked(" UTC");
+    }
+
+    f.write_str(buf.as_str())
 }
 
 fn ymd_from_days(unix_days: i64) -> (i64, u8, u8) {
@@ -137,8 +172,6 @@ mod tests {
             (0x00FFFFFFFFFFFFFF, "+2283416158-11-23T12:52:15Z"),
             (0x7FFFFFFFFFFFFFFF, "+292277026530-12-04T15:30:07Z"),
         ];
-
-        assert_eq!(format!("{:?}", DateTime::<Utc>::MAX_UTC), "");
 
         for (stamp, iso_date) in dates {
             let stamp = LongDateTime::from_epoch_seconds(stamp as i64);
