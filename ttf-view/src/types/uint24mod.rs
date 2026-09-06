@@ -22,7 +22,7 @@ impl uint24 {
     ///
     /// ```
     /// # use ttf_view::types::uint24;
-    /// assert_eq!(uint24::MIN.get(), 0);
+    /// assert_eq!(uint24::MIN, 0);
     /// ```
     pub const MIN: Self = Self::new(0x000000).unwrap();
     /// The largest value that can be represented by this integer type (2<sup>24</sup> &minus; 1).
@@ -31,7 +31,7 @@ impl uint24 {
     ///
     /// ```
     /// # use ttf_view::types::uint24;
-    /// assert_eq!(uint24::MAX.get(), 16_777_215);
+    /// assert_eq!(uint24::MAX, 16_777_215);
     /// ```
     pub const MAX: Self = Self::new(0xFFFFFF).unwrap();
 
@@ -42,9 +42,9 @@ impl uint24 {
     /// ```
     /// use ttf_view::types::uint24;
     ///
-    /// assert_eq!(uint24::new(1234).unwrap().get(), 1234);
-    /// assert_eq!(uint24::new(15_000_000).unwrap().get(), 15_000_000);
-    /// assert_eq!(uint24::new(0xFFFFFF).unwrap().get(), 0xFFFFFF);
+    /// assert_eq!(uint24::new(1234).unwrap(), 1234);
+    /// assert_eq!(uint24::new(15_000_000).unwrap(), 15_000_000);
+    /// assert_eq!(uint24::new(0xFFFFFF).unwrap(), 0xFFFFFF);
     /// assert_eq!(uint24::new(17_000_000), None);
     /// assert_eq!(uint24::new(3_999_000_000), None);
     /// ```
@@ -74,8 +74,8 @@ impl uint24 {
     /// ```
     /// use ttf_view::types::uint24;
     ///
-    /// assert_eq!(uint24::from_be_bytes([0x00, 0x00, 0x07]).get(), 7);
-    /// assert_eq!(uint24::from_be_bytes([0x12, 0x34, 0x56]).get(), 0x00123456);
+    /// assert_eq!(uint24::from_be_bytes([0x00, 0x00, 0x07]), 7);
+    /// assert_eq!(uint24::from_be_bytes([0x12, 0x34, 0x56]), 0x00123456);
     /// ```
     pub const fn from_be_bytes(bytes: [u8; 3]) -> Self {
         Self(bytes)
@@ -101,8 +101,8 @@ impl uint24 {
     /// ```
     /// use ttf_view::types::uint24;
     ///
-    /// assert_eq!(uint24::new(1234).unwrap().get(), 1234);
-    /// assert_eq!(uint24::new(15_000_000).unwrap().get(), 15_000_000);
+    /// assert_eq!(uint24::new(1234).unwrap(), 1234);
+    /// assert_eq!(uint24::new(15_000_000).unwrap(), 15_000_000);
     /// ```
     pub const fn get(&self) -> u32 {
         let mut buf = [0; 4];
