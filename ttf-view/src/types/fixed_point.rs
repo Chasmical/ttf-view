@@ -145,7 +145,7 @@ macro_rules! impl_fixed_point_number {
 
         impl_fmt_with! {
             Debug, Display, LowerExp, UpperExp:
-            |x: &$Name, f| x.get().fmt(f)
+            |x: &$Name| x.get()
         }
 
         const impl PartialOrd for $Name {

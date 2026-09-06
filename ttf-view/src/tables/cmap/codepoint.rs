@@ -15,7 +15,7 @@ impl Codepoint {
 
 impl_fmt_with! {
     Debug, Display, Binary, Octal, LowerHex, UpperHex, LowerExp, UpperExp:
-    |this: &Codepoint, f| this.get().fmt(f)
+    |this: &Codepoint| this.get()
 }
 
 // Conversions from std integer types to Codepoint

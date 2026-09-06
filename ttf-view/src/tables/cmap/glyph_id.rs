@@ -26,7 +26,7 @@ impl GlyphId {
 
 impl_fmt_with! {
     Debug, Display, Binary, Octal, LowerHex, UpperHex, LowerExp, UpperExp:
-    |this: &GlyphId, f| this.get().fmt(f)
+    |this: &GlyphId| this.get()
 }
 
 // Conversions from std integer types to GlyphId

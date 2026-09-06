@@ -113,7 +113,7 @@ impl uint24 {
 
 impl_fmt_with! {
     Debug, Display, Binary, Octal, LowerHex, UpperHex, LowerExp, UpperExp:
-    |this: &uint24, f| this.get().fmt(f)
+    |this: &uint24| this.get()
 }
 
 // TODO: When [u8; 3]'s Default is constified, replace this impl with #[derive_const]
