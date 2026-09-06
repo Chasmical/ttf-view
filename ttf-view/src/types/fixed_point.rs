@@ -7,7 +7,13 @@ macro_rules! impl_fixed_point_number {
             $int:ty as [u8; $bytes:literal];
             $integer_bits:literal | $fraction_bits:literal as $fp:ty
         );
+        docs { DENOM = $d_denom:literal }
     ) => {
+        #[doc = concat!("The [OpenType ", stringify!($Name), "][spec] type, a ")]
+        #[doc = concat!(stringify!($integer_bits), ".", stringify!($fraction_bits), "-bit")]
+        /// signed fixed-point type.
+        ///
+        /// [spec]: https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types
         $(#[$outer])*
         #[derive(Copy, Hash)]
         #[derive_const(Clone, PartialEq, Eq)]
@@ -24,6 +30,22 @@ macro_rules! impl_fixed_point_number {
             const MIN: $fp = -(1 << $integer_bits) as $fp;
             const MAX: $fp = ((1 << $integer_bits) - 1) as $fp;
 
+            #[doc = concat!("Creates a [`", stringify!($Name), "`] from [`", stringify!($fp), "`].")]
+            ///
+            /// # Examples
+            ///
+            /// ```
+            #[doc = concat!("use ttf_view::types::", stringify!($Name), ";")]
+            ///
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new(-0.125).unwrap().get(), -0.125);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new(1.99609375).unwrap().get(), 1.99609375);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new(123456.78), None);")]
+            ///
+            #[doc = concat!("// numbers are rounded towards the closest value representable by ", stringify!($Name))]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new(0.5156247).unwrap().get(), 0.515625);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new(0.5156250).unwrap().get(), 0.515625);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new(0.5156254).unwrap().get(), 0.515625);")]
+            /// ```
             pub const fn new(num: $fp) -> Option<Self> {
                 if matches!(num, Self::MIN..Self::MAX) {
                     // TODO: Could this sometimes result in overflow? e.g. 1.999999 wrapping to -2?
@@ -32,19 +54,28 @@ macro_rules! impl_fixed_point_number {
                     None
                 }
             }
+            #[doc = concat!("Creates a [`", stringify!($Name), "`] from [`", stringify!($fp), "`] without checks.")]
+            ///
+            /// TODO: # Examples
             pub const unsafe fn new_unchecked(num: $fp) -> Self {
                 debug_assert!(matches!(num, Self::MIN..Self::MAX));
                 Self(((num / Self::STEP).round() as $int).to_be_bytes())
             }
 
+            #[doc = concat!("Creates a [`", stringify!($Name), "`] from big-endian bytes.")]
+            ///
+            /// TODO: # Examples
             pub const fn from_be_bytes(bytes: [u8; $bytes]) -> Self {
                 Self(bytes)
             }
+            #[doc = concat!("Gets this [`", stringify!($Name), "`]'s big-endian bytes.")]
+            ///
+            /// TODO: # Examples
             pub const fn to_be_bytes(self) -> [u8; $bytes] {
                 self.0
             }
 
-            // Determine how many decimal places the type can accurately represent
+            /// The amount of decimal places the type can accurately represent.
             pub const PRECISION: u32 = {
                 let mut x = Self::STEP;
                 let mut times = 0;
@@ -55,12 +86,22 @@ macro_rules! impl_fixed_point_number {
                 times - 1
             };
 
+            #[doc = concat!("Returns this [`", stringify!($Name), "`] fraction's numerator")]
+            #[doc = concat!("(`", stringify!($Name), "` represented as <math><mfrac><mi>numerator</mi><mn>", stringify!($d_denom), "</mn></mfrac></math>).")]
+            ///
+            /// TODO: # Examples
             pub const fn frac_num(&self) -> $int {
                 <$int>::from_be_bytes(self.0)
             }
+            #[doc = concat!("Returns this [`", stringify!($Name), "`]'s value as [`", stringify!($fp), "`].")]
+            ///
+            /// TODO: # Examples
             pub const fn get(&self) -> $fp {
                 self.frac_num() as $fp * Self::STEP
             }
+            #[doc = concat!("Rounds this [`", stringify!($Name), "`]'s value to [`PRECISION`][Self::PRECISION] decimal places.")]
+            ///
+            /// TODO: # Examples
             pub const fn round_to_precision(&self) -> $fp {
                 const MULT: $fp = 10u32.pow($Name::PRECISION) as $fp;
                 (self.get() * MULT).round() / MULT
@@ -118,9 +159,11 @@ macro_rules! impl_fixed_point_number {
 
 impl_fixed_point_number! {
     pub struct Fixed(i32 as [u8; 4]; 16|16 as f64);
+    docs { DENOM = 65536 }
 }
 impl_fixed_point_number! {
     pub struct F2DOT14(i16 as [u8; 2]; 2|14 as f32);
+    docs { DENOM = 16384 }
 }
 
 #[cfg(test)]
