@@ -2,14 +2,14 @@
 use zerocopy::network_endian::{I16, I32, U16, U32};
 
 pub type int16 = I16;
-pub type uint16 = U16;
 pub type int32 = I32;
+pub type uint16 = U16;
 pub type uint32 = U32;
 
+// These distinctions aren't really necessary, but we'll keep it for better understanding of values
 pub type FWORD = int16;
 pub type UFWORD = uint16;
 
-// TODO: Is there any point in this distinction?
 pub type Offset8 = u8;
 pub type Offset16 = uint16;
 pub type Offset24 = uint24;

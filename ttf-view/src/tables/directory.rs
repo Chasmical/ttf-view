@@ -85,16 +85,16 @@ impl<'a> TableRecordHandle<'a> {
     }
 
     pub fn calculate_checksum(&self) -> u32 {
-        let (uint32s, rest) = self.table_as_bytes().as_chunks::<4>();
+        let (uint32s, unpadded) = self.table_as_bytes().as_chunks::<4>();
         let mut sum: u32 = 0;
 
         for chunk in uint32s {
             sum = sum.wrapping_add(u32::from_be_bytes(*chunk));
         }
 
-        if !rest.is_empty() {
+        if !unpadded.is_empty() {
             let mut buf = [0; 4];
-            buf[..rest.len()].copy_from_slice(rest);
+            buf[..unpadded.len()].copy_from_slice(unpadded);
             sum = sum.wrapping_add(u32::from_be_bytes(buf));
         }
 
