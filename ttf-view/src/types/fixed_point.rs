@@ -76,15 +76,7 @@ macro_rules! impl_fixed_point_number {
             }
 
             /// The amount of decimal places the type can accurately represent.
-            pub const PRECISION: u32 = {
-                let mut x = Self::STEP;
-                let mut times = 0;
-                while x.round() < 1 as $fp {
-                    times += 1;
-                    x *= 10 as $fp;
-                }
-                times - 1
-            };
+            pub const PRECISION: u32 = (Self::STEP.recip() as u32).ilog10();
 
             #[doc = concat!("Returns this [`", stringify!($Name), "`] fraction's numerator")]
             #[doc = concat!("(`", stringify!($Name), "` represented as <math><mfrac><mi>numerator</mi><mn>", stringify!($d_denom), "</mn></mfrac></math>).")]
@@ -103,16 +95,14 @@ macro_rules! impl_fixed_point_number {
             ///
             /// TODO: # Examples
             pub const fn round_to_precision(&self) -> $fp {
-                const MULT: $fp = 10u32.pow($Name::PRECISION) as $fp;
-                (self.get() * MULT).round() / MULT
+                const SCALE: $fp = 10u32.pow($Name::PRECISION) as $fp;
+                (self.get() * SCALE).round() / SCALE
             }
         }
 
         impl_fmt_with! {
             Debug, Display, LowerExp, UpperExp:
-            |x: &$Name, f| {
-                (if f.precision().is_none() { x.round_to_precision() } else { x.get() }).fmt(f)
-            }
+            |x: &$Name, f| x.get().fmt(f)
         }
 
         const impl PartialOrd for $Name {
@@ -173,10 +163,12 @@ mod tests {
     #[test]
     fn precision() {
         assert_eq!(Fixed::PRECISION, 4);
-        assert_eq!(F2DOT14::PRECISION, 3);
+        assert_eq!(F2DOT14::PRECISION, 4);
 
         let f = Fixed::from_be_bytes(0x0001999A_u32.to_be_bytes());
-        assert_eq!(format!("{}", f), "1.6");
+        assert_eq!(format!("{}", f), "1.600006103515625");
+        assert_eq!(format!("{}", f.round_to_precision()), "1.6");
+
         assert_eq!(format!("{:.0}", f), "2");
         assert_eq!(format!("{:.1}", f), "1.6");
         assert_eq!(format!("{:.3}", f), "1.600");
