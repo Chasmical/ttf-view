@@ -20,6 +20,10 @@ pub struct SubHeaderRepr {
     pub id_range_offset: uint16,
 }
 
+impl super::CmapSubtableTrait for CmapSubtableFormat2Repr {
+    const FORMAT: u16 = 2;
+}
+
 impl CmapSubtableFormat2Repr {
     pub fn sub_headers(&self) -> &[SubHeaderRepr] {
         let max_offset = self.sub_header_keys.iter().max().unwrap().get();

@@ -14,4 +14,8 @@ pub struct ConstantMapGroupRepr {
     pub glyph_id: uint32,
 }
 
+impl super::CmapSubtableTrait for CmapSubtableFormat13Repr {
+    const FORMAT: u16 = 13;
+}
+
 // TODO: 'cmap' subtable format 13

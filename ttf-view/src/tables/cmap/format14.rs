@@ -40,4 +40,8 @@ pub struct UvsMappingRepr {
     pub glyph_id: uint16,
 }
 
+impl super::CmapSubtableTrait for CmapSubtableFormat14Repr {
+    const FORMAT: u16 = 14;
+}
+
 // TODO: 'cmap' subtable format 14

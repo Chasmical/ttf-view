@@ -5,6 +5,10 @@ pub struct CmapSubtableFormat0Repr {
     pub glyph_id_array: [u8; 256],
 }
 
+impl super::CmapSubtableTrait for CmapSubtableFormat0Repr {
+    const FORMAT: u16 = 0;
+}
+
 impl CmapSubtableFormat0Repr {
     pub const fn map(&self, codepoint: u8) -> GlyphId {
         self.glyph_id_array[codepoint as usize].into()

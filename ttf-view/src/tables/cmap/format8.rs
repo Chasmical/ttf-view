@@ -15,4 +15,8 @@ pub struct SequentialMapGroupRepr {
     pub start_glyph_id: uint32,
 }
 
+impl super::CmapSubtableTrait for CmapSubtableFormat8Repr {
+    const FORMAT: u16 = 8;
+}
+
 // TODO: 'cmap' subtable format 8

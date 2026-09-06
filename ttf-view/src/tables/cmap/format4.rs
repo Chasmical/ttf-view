@@ -16,4 +16,8 @@ pub struct CmapSubtableFormat4Repr {
     // : glyph_id_array: [uint16; arbitrary length],
 }
 
+impl super::CmapSubtableTrait for CmapSubtableFormat4Repr {
+    const FORMAT: u16 = 4;
+}
+
 // TODO: 'cmap' subtable format 4

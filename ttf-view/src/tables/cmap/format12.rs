@@ -7,4 +7,8 @@ pub struct CmapSubtableFormat12Repr {
     groups: [SequentialMapGroupRepr; 0],
 }
 
+impl super::CmapSubtableTrait for CmapSubtableFormat12Repr {
+    const FORMAT: u16 = 12;
+}
+
 // TODO: 'cmap' subtable format 12
