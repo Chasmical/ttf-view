@@ -246,7 +246,7 @@ implement_tables!(dir {
     tags::meta, "Metadata Table"; // dir.meta() => meta::MetaTableRepr;
     tags::MVAR, "Metrics Variations Table"; // dir.mvar() => mvar::MvarTableRepr;
     tags::name, "Naming Table", dir.name() => name::NameTableRepr;
-    tags::OS_2, "OS/2 and Windows Metrics Table"; // dir.os_2() => os_2::Os_2TableRepr;
+    tags::OS_2, "OS/2 and Windows Metrics Table", dir.os_2() => os_2::Os_2;
     tags::PCLT, "PCL 5 Table"; // dir.pclt() => pclt::PcltTableRepr;
     tags::post, "PostScript Table"; // dir.post() => post::PostTableRepr;
     tags::prep, "Control Value Program"; // dir.prep() => prep::PrepTableRepr;

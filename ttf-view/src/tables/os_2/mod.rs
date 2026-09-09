@@ -267,8 +267,8 @@ impl std::fmt::Debug for Os_2<'_> {
         }
         if let Some(v1) = self.v1() {
             // TODO: impl Debug for CodePages
-            f.field("ul_code_page_range_1", &v1.ul_code_page_range_1)
-                .field("ul_code_page_range_2", &v1.ul_code_page_range_2);
+            f.field("ul_code_page_range_1", &v1.ul_code_page_range_1.get())
+                .field("ul_code_page_range_2", &v1.ul_code_page_range_2.get());
         }
         if let Some(v4) = self.v4() {
             f.field("sx_height", &v4.sx_height.get())
