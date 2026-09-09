@@ -9,6 +9,7 @@ pub mod hhea;
 pub mod hmtx;
 pub mod maxp;
 pub mod name;
+pub mod os_2;
 
 pub trait Table {
     const TAG: Tag;
@@ -46,6 +47,9 @@ impl TableDirectoryRepr {
         self.table()
     }
     pub fn name(&self) -> Option<&name::NameTableRepr> {
+        self.table()
+    }
+    pub fn os_2(&self) -> Option<os_2::Os_2<'_>> {
         self.table()
     }
 }

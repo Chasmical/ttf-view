@@ -54,6 +54,7 @@
 #![feature(const_index)]
 #![feature(const_iter)]
 #![feature(const_cmp)]
+#![feature(const_ops)]
 #![feature(const_try)]
 #![feature(derive_const)]
 #![feature(bstr)]
