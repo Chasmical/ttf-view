@@ -1,9 +1,14 @@
 use crate::types::{FWORD, Tag, UFWORD, int16, tags, uint16};
 
 #[repr(C)]
-pub struct HheaTableRepr {
+pub struct HheaV0 {
     pub major_version: uint16,
     pub minor_version: uint16,
+}
+#[repr(C)]
+pub struct HheaV1 {
+    base: HheaV0,
+    // version = 1.x:
     pub ascender: FWORD,
     pub descender: FWORD,
     pub line_gap: FWORD,
@@ -22,32 +27,82 @@ pub struct HheaTableRepr {
     pub number_of_h_metrics: uint16,
 }
 
-impl super::Table for HheaTableRepr {
-    const TAG: Tag = tags::hhea;
-    type Handle<'a> = &'a Self;
+const impl std::ops::Deref for HheaV1 {
+    type Target = HheaV0;
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
 }
 
-impl std::fmt::Debug for HheaTableRepr {
+impl super::RawTable for HheaV0 {
+    const TAG: Tag = tags::hhea;
+}
+impl<'a> super::Table<'a> for Hhea<'a> {
+    const TAG: Tag = tags::hhea;
+    fn in_directory(dir: &'a super::TableDirectoryRepr) -> Option<Self> {
+        Some(Self { hhea: dir.table_raw()? })
+    }
+}
+
+#[derive(Copy)]
+#[derive_const(Clone)]
+pub struct Hhea<'a> {
+    hhea: &'a HheaV0,
+}
+
+const impl std::ops::Deref for Hhea<'_> {
+    type Target = HheaV0;
+    fn deref(&self) -> &Self::Target {
+        self.hhea
+    }
+}
+
+impl<'a> Hhea<'a> {
+    pub const fn v1(&self) -> Option<&'a HheaV1> {
+        if self.major_version.get() == 1 {
+            Some(unsafe { std::mem::transmute::<&HheaV0, &HheaV1>(self.hhea) })
+        } else {
+            None
+        }
+    }
+}
+
+impl std::fmt::Debug for Hhea<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("HheaTable")
-            .field("major_version", &self.major_version.get())
-            .field("minor_version", &self.minor_version.get())
-            .field("ascender", &self.ascender.get())
-            .field("descender", &self.descender.get())
-            .field("line_gap", &self.line_gap.get())
-            .field("advance_width_max", &self.advance_width_max.get())
-            .field("min_left_side_bearing", &self.min_left_side_bearing.get())
-            .field("min_right_side_bearing", &self.min_right_side_bearing.get())
-            .field("x_max_extent", &self.x_max_extent.get())
-            .field("caret_slope_rise", &self.caret_slope_rise.get())
-            .field("caret_slope_run", &self.caret_slope_run.get())
-            .field("caret_offset", &self.caret_offset.get())
-            .field("reserved0", &self.reserved0.get())
-            .field("reserved1", &self.reserved1.get())
-            .field("reserved2", &self.reserved2.get())
-            .field("reserved3", &self.reserved3.get())
-            .field("metric_data_format", &self.metric_data_format.get())
-            .field("number_of_h_metrics", &self.number_of_h_metrics.get())
-            .finish()
+        let mut f = f.debug_struct("HheaTable");
+        f.field("major_version", &self.major_version.get())
+            .field("minor_version", &self.minor_version.get());
+
+        if let Some(v1) = self.v1() {
+            f.field("ascender", &v1.ascender.get());
+            f.field("descender", &v1.descender.get());
+            f.field("line_gap", &v1.line_gap.get());
+            f.field("advance_width_max", &v1.advance_width_max.get());
+            f.field("min_left_side_bearing", &v1.min_left_side_bearing.get());
+            f.field("min_right_side_bearing", &v1.min_right_side_bearing.get());
+            f.field("x_max_extent", &v1.x_max_extent.get());
+            f.field("caret_slope_rise", &v1.caret_slope_rise.get());
+            f.field("caret_slope_run", &v1.caret_slope_run.get());
+            f.field("caret_offset", &v1.caret_offset.get());
+            f.field("reserved0", &v1.reserved0.get());
+            f.field("reserved1", &v1.reserved1.get());
+            f.field("reserved2", &v1.reserved2.get());
+            f.field("reserved3", &v1.reserved3.get());
+            f.field("metric_data_format", &v1.metric_data_format.get());
+            f.field("number_of_h_metrics", &v1.number_of_h_metrics.get());
+        }
+        f.finish()
+    }
+}
+
+// Monomorphize all fmts to the above fmt for Hhea<'a>
+impl std::fmt::Debug for HheaV0 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Hhea { hhea: self }.fmt(f)
+    }
+}
+impl std::fmt::Debug for HheaV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Hhea { hhea: self }.fmt(f)
     }
 }

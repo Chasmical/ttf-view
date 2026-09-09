@@ -13,6 +13,8 @@ use std::{fmt, num::ParseIntError};
 pub struct Version16Dot16([u8; 4]);
 
 impl Version16Dot16 {
+    /// Version 0.5.
+    pub const V0_5: Self = Self::new(0, 5).unwrap();
     /// Version 1.0.
     pub const V1_0: Self = Self::new(1, 0).unwrap();
 

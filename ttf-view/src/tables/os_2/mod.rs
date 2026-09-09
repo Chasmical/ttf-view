@@ -103,11 +103,11 @@ const impl std::ops::Deref for Os_2V5 {
     }
 }
 
-impl super::Table for Os_2Base {
+impl super::RawTable for Os_2Base {
     const TAG: Tag = tags::OS_2;
-    type Handle<'a> = Os_2<'a>;
 }
-impl<'a> super::TableHandle<'a> for Os_2<'a> {
+impl<'a> super::Table<'a> for Os_2<'a> {
+    const TAG: Tag = tags::OS_2;
     fn in_directory(dir: &'a TableDirectoryRepr) -> Option<Self> {
         let record = dir.table_record(tags::OS_2)?;
         Some(Self { base: record.table_as()?, len: record.length.get() })

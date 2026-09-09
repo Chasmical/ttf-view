@@ -11,42 +11,32 @@ pub mod maxp;
 pub mod name;
 pub mod os_2;
 
-pub trait Table {
+pub trait RawTable {
     const TAG: Tag;
-    type Handle<'a>: TableHandle<'a>;
-    fn in_directory(dir: &TableDirectoryRepr) -> Option<Self::Handle<'_>> {
-        Self::Handle::in_directory(dir)
-    }
 }
-
-pub trait TableHandle<'a>: Sized {
+pub trait Table<'a>: Sized {
+    const TAG: Tag;
     fn in_directory(dir: &'a TableDirectoryRepr) -> Option<Self>;
-}
-
-impl<'a, T: Table> TableHandle<'a> for &'a T {
-    fn in_directory(dir: &'a TableDirectoryRepr) -> Option<Self> {
-        dir.table_raw::<T>()
-    }
 }
 
 impl TableDirectoryRepr {
     // Note: Even though these tables are required, we'll still use Option here
-    pub fn cmap(&self) -> Option<&cmap::CmapTableRepr> {
+    pub fn cmap(&self) -> Option<cmap::Cmap<'_>> {
         self.table()
     }
-    pub fn head(&self) -> Option<&head::HeadTableRepr> {
+    pub fn head(&self) -> Option<head::Head<'_>> {
         self.table()
     }
-    pub fn hhea(&self) -> Option<&hhea::HheaTableRepr> {
+    pub fn hhea(&self) -> Option<hhea::Hhea<'_>> {
         self.table()
     }
-    pub fn hmtx(&self) -> Option<hmtx::HmtxTableHandle<'_>> {
+    pub fn hmtx(&self) -> Option<hmtx::Hmtx<'_>> {
         self.table()
     }
-    pub fn maxp(&self) -> Option<&maxp::MaxpTableRepr> {
+    pub fn maxp(&self) -> Option<maxp::Maxp<'_>> {
         self.table()
     }
-    pub fn name(&self) -> Option<&name::NameTableRepr> {
+    pub fn name(&self) -> Option<name::Name<'_>> {
         self.table()
     }
     pub fn os_2(&self) -> Option<os_2::Os_2<'_>> {

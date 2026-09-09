@@ -3,30 +3,32 @@ use crate::{
     types::{FWORD, Tag, UFWORD, tags},
 };
 
+// Note: HmtxRaw can't provide anything on its own. We need data from two other tables:
+// `number_of_h_metrics` from 'hhea' and `num_glyphs` from 'maxp' to slice the data correctly.
 #[repr(C)]
-#[non_exhaustive]
-pub struct HmtxTableRepr {
+struct HmtxRaw {
     /// Note: It's a little bit faster to work with `&[FWORD]` than with separately typed slices.
-    /// See [`HmtxTableHandle::metric`] method for explanation.
+    /// See [`Hmtx::metric`] method for explanation.
     raw_words: [FWORD; 0],
     // : h_metrics: [LongHorMetricRepr; hhea().num_h_metrics],
     // : left_side_bearings: [FWORD; maxp().num_glyphs - hhea().num_h_metrics],
 }
+
 #[repr(C)]
 pub struct LongHorMetricRepr {
     pub advance_width: UFWORD,
     pub lsb: FWORD,
 }
 
-impl super::Table for HmtxTableRepr {
-    const TAG: Tag = tags::hmtx;
-    type Handle<'a> = HmtxTableHandle<'a>;
+impl super::RawTable for HmtxRaw {
+    const TAG: Tag = tags::head;
 }
-impl<'a> super::TableHandle<'a> for HmtxTableHandle<'a> {
+impl<'a> super::Table<'a> for Hmtx<'a> {
+    const TAG: Tag = tags::hmtx;
     fn in_directory(dir: &'a TableDirectoryRepr) -> Option<Self> {
-        let raw_words = dir.table_raw::<HmtxTableRepr>()?.raw_words.as_ptr();
-        let num_h_metrics = dir.hhea()?.number_of_h_metrics.get() as usize;
-        let num_glyphs = dir.maxp()?.num_glyphs.get() as usize;
+        let raw_words = dir.table_raw::<HmtxRaw>()?.raw_words.as_ptr();
+        let num_h_metrics = dir.hhea()?.v1()?.number_of_h_metrics.get() as usize;
+        let num_glyphs = dir.maxp()?.v05()?.num_glyphs.get() as usize;
 
         let total_word_count = num_h_metrics + num_glyphs;
         let raw_words = unsafe { std::slice::from_raw_parts(raw_words, total_word_count) };
@@ -35,11 +37,9 @@ impl<'a> super::TableHandle<'a> for HmtxTableHandle<'a> {
     }
 }
 
-// Note: HmtxTableRepr can't provide anything on its own. We need data from two other tables:
-// `number_of_h_metrics` from 'hhea' and `num_glyphs` from 'maxp' to slice the data correctly.
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct HmtxTableHandle<'a> {
+pub struct Hmtx<'a> {
     raw_words: &'a [FWORD],
     num_h_metrics: usize,
 }
@@ -62,7 +62,7 @@ const impl From<&LongHorMetricRepr> for LongHorMetric {
     }
 }
 
-impl<'a> HmtxTableHandle<'a> {
+impl<'a> Hmtx<'a> {
     pub const fn num_h_metrics(&self) -> u16 {
         self.num_h_metrics as u16
     }
@@ -137,14 +137,14 @@ impl<'a> HmtxTableHandle<'a> {
     }
 }
 
-const impl<'a> IntoIterator for HmtxTableHandle<'a> {
+const impl<'a> IntoIterator for Hmtx<'a> {
     type Item = (GlyphId, LongHorMetric);
     type IntoIter = Iter<'a>;
     fn into_iter(self) -> Self::IntoIter {
         Iter::new(self)
     }
 }
-const impl<'a> IntoIterator for &HmtxTableHandle<'a> {
+const impl<'a> IntoIterator for &Hmtx<'a> {
     type Item = (GlyphId, LongHorMetric);
     type IntoIter = Iter<'a>;
     fn into_iter(self) -> Self::IntoIter {
@@ -162,7 +162,7 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iter<'a> {
-    pub const fn new(hmtx: HmtxTableHandle<'a>) -> Self {
+    pub const fn new(hmtx: Hmtx<'a>) -> Self {
         Self {
             glyph_id: 0,
             num_h_metrics: hmtx.num_h_metrics(),
@@ -200,3 +200,5 @@ impl ExactSizeIterator for Iter<'_> {
     }
 }
 impl std::iter::FusedIterator for Iter<'_> {}
+
+// TODO: impl Debug for Hmtx<'_>

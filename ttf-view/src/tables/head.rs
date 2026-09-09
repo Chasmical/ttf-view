@@ -1,9 +1,14 @@
 use crate::types::{Fixed, LongDateTime, Tag, int16, tags, uint16, uint32};
 
 #[repr(C)]
-pub struct HeadTableRepr {
+pub struct HeadV0 {
     pub major_version: uint16,
     pub minor_version: uint16,
+}
+#[repr(C)]
+pub struct HeadV1 {
+    base: HeadV0,
+    // version = 1.x:
     pub font_revision: Fixed,
     pub checksum_adjustment: uint32,
     pub magic_number: uint32,
@@ -22,32 +27,82 @@ pub struct HeadTableRepr {
     pub glyph_data_format: int16,
 }
 
-impl super::Table for HeadTableRepr {
-    const TAG: Tag = tags::head;
-    type Handle<'a> = &'a Self;
+const impl std::ops::Deref for HeadV1 {
+    type Target = HeadV0;
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
 }
 
-impl std::fmt::Debug for HeadTableRepr {
+impl super::RawTable for HeadV0 {
+    const TAG: Tag = tags::head;
+}
+impl<'a> super::Table<'a> for Head<'a> {
+    const TAG: Tag = tags::head;
+    fn in_directory(dir: &'a super::TableDirectoryRepr) -> Option<Self> {
+        Some(Self { head: dir.table_raw()? })
+    }
+}
+
+#[derive(Copy)]
+#[derive_const(Clone)]
+pub struct Head<'a> {
+    head: &'a HeadV0,
+}
+
+const impl std::ops::Deref for Head<'_> {
+    type Target = HeadV0;
+    fn deref(&self) -> &Self::Target {
+        self.head
+    }
+}
+
+impl<'a> Head<'a> {
+    pub const fn v1(&self) -> Option<&'a HeadV1> {
+        if self.major_version.get() == 1 {
+            Some(unsafe { std::mem::transmute::<&HeadV0, &HeadV1>(self.head) })
+        } else {
+            None
+        }
+    }
+}
+
+impl std::fmt::Debug for Head<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("HeadTable")
-            .field("major_version", &self.major_version.get())
-            .field("minor_version", &self.minor_version.get())
-            .field("font_revision", &self.font_revision)
-            .field_with("checksum_adjustment", |f| write!(f, "{:#010X}", self.checksum_adjustment))
-            .field_with("magic_number", |f| write!(f, "{:#010X}", self.magic_number))
-            .field_with("flags", |f| write!(f, "{:#017b}", self.flags))
-            .field("units_per_em", &self.units_per_em.get())
-            .field_with("created", |f| write!(f, "{}", self.created))
-            .field_with("modified", |f| write!(f, "{}", self.modified))
-            .field("x_min", &self.x_min.get())
-            .field("y_min", &self.y_min.get())
-            .field("x_max", &self.x_max.get())
-            .field("y_max", &self.y_max.get())
-            .field_with("mac_style", |f| write!(f, "{:#09b}", self.mac_style))
-            .field("lowest_rec_ppem", &self.lowest_rec_ppem.get())
-            .field("font_direction_hint", &self.font_direction_hint.get())
-            .field("index_to_loc_format", &self.index_to_loc_format.get())
-            .field("glyph_data_format", &self.glyph_data_format.get())
-            .finish()
+        let mut f = f.debug_struct("HeadTable");
+        f.field("major_version", &self.major_version.get())
+            .field("minor_version", &self.minor_version.get());
+
+        if let Some(v1) = self.v1() {
+            f.field("font_revision", &v1.font_revision);
+            f.field_with("checksum_adjustment", |f| write!(f, "{:#010X}", v1.checksum_adjustment));
+            f.field_with("magic_number", |f| write!(f, "{:#010X}", v1.magic_number));
+            f.field_with("flags", |f| write!(f, "{:#017b}", v1.flags));
+            f.field("units_per_em", &v1.units_per_em.get());
+            f.field_with("created", |f| write!(f, "{}", v1.created));
+            f.field_with("modified", |f| write!(f, "{}", v1.modified));
+            f.field("x_min", &v1.x_min.get());
+            f.field("y_min", &v1.y_min.get());
+            f.field("x_max", &v1.x_max.get());
+            f.field("y_max", &v1.y_max.get());
+            f.field_with("mac_style", |f| write!(f, "{:#09b}", v1.mac_style));
+            f.field("lowest_rec_ppem", &v1.lowest_rec_ppem.get());
+            f.field("font_direction_hint", &v1.font_direction_hint.get());
+            f.field("index_to_loc_format", &v1.index_to_loc_format.get());
+            f.field("glyph_data_format", &v1.glyph_data_format.get());
+        }
+        f.finish()
+    }
+}
+
+// Monomorphize all fmts to the above fmt for Head<'a>
+impl std::fmt::Debug for HeadV0 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Head { head: self }.fmt(f)
+    }
+}
+impl std::fmt::Debug for HeadV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Head { head: self }.fmt(f)
     }
 }

@@ -1,16 +1,19 @@
 use crate::types::{Tag, Version16Dot16, tags, uint16};
 
 #[repr(C)]
-pub struct MaxpTableRepr {
-    // version ≥ 0.5:
+pub struct MaxpV0 {
     pub version: Version16Dot16,
-    pub num_glyphs: uint16,
-    // version ≥ 1.0:
-    v1_fields: MaxpTableReprV1Fields,
 }
-
 #[repr(C)]
-pub struct MaxpTableReprV1Fields {
+pub struct MaxpV05 {
+    base: MaxpV0,
+    // version ≥ 0.5:
+    pub num_glyphs: uint16,
+}
+#[repr(C)]
+pub struct MaxpV1 {
+    v05: MaxpV05,
+    // version ≥ 1.0:
     pub max_points: uint16,
     pub max_contours: uint16,
     pub max_composite_points: uint16,
@@ -26,39 +29,101 @@ pub struct MaxpTableReprV1Fields {
     pub max_component_depth: uint16,
 }
 
-impl super::Table for MaxpTableRepr {
-    const TAG: Tag = tags::maxp;
-    type Handle<'a> = &'a Self;
+const impl std::ops::Deref for MaxpV05 {
+    type Target = MaxpV0;
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
 }
-
-impl MaxpTableRepr {
-    pub const fn v1_fields(&self) -> Option<&MaxpTableReprV1Fields> {
-        if self.version >= Version16Dot16::V1_0 { Some(&self.v1_fields) } else { None }
+const impl std::ops::Deref for MaxpV1 {
+    type Target = MaxpV05;
+    fn deref(&self) -> &Self::Target {
+        &self.v05
     }
 }
 
-impl std::fmt::Debug for MaxpTableRepr {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut builder = f.debug_struct("MaxpTable");
-        builder.field("version", &self.version).field("num_glyphs", &self.num_glyphs.get());
+impl super::RawTable for MaxpV0 {
+    const TAG: Tag = tags::maxp;
+}
+impl<'a> super::Table<'a> for Maxp<'a> {
+    const TAG: Tag = tags::maxp;
+    fn in_directory(dir: &'a super::TableDirectoryRepr) -> Option<Self> {
+        Some(Self { maxp: dir.table_raw()? })
+    }
+}
 
-        if let Some(v1) = self.v1_fields() {
-            builder
-                .field("max_points", &v1.max_points.get())
-                .field("max_contours", &v1.max_contours.get())
-                .field("max_composite_points", &v1.max_composite_points.get())
-                .field("max_composite_contours", &v1.max_composite_contours.get())
-                .field("max_zones", &v1.max_zones.get())
-                .field("max_twilight_points", &v1.max_twilight_points.get())
-                .field("max_storage", &v1.max_storage.get())
-                .field("max_function_defs", &v1.max_function_defs.get())
-                .field("max_instruction_defs", &v1.max_instruction_defs.get())
-                .field("max_stack_elements", &v1.max_stack_elements.get())
-                .field("max_size_of_instructions", &v1.max_size_of_instructions.get())
-                .field("max_component_elements", &v1.max_component_elements.get())
-                .field("max_component_depth", &v1.max_component_depth.get());
+#[derive(Copy)]
+#[derive_const(Clone)]
+pub struct Maxp<'a> {
+    maxp: &'a MaxpV0,
+}
+
+const impl std::ops::Deref for Maxp<'_> {
+    type Target = MaxpV0;
+    fn deref(&self) -> &Self::Target {
+        self.maxp
+    }
+}
+
+impl<'a> Maxp<'a> {
+    pub const fn v05(&self) -> Option<&'a MaxpV05> {
+        let (major, minor) = self.version.tuple();
+        if major == 0 && minor >= 5 || major == 1 {
+            Some(unsafe { std::mem::transmute::<&MaxpV0, &MaxpV05>(self.maxp) })
+        } else {
+            None
+        }
+    }
+    pub const fn v1(&self) -> Option<&'a MaxpV1> {
+        if self.version.major() == 1 {
+            Some(unsafe { std::mem::transmute::<&MaxpV0, &MaxpV1>(self.maxp) })
+        } else {
+            None
+        }
+    }
+}
+
+impl std::fmt::Debug for Maxp<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut f = f.debug_struct("MaxpTable");
+        f.field("version", &self.version);
+
+        if let Some(v05) = self.v05() {
+            f.field("num_glyphs", &v05.num_glyphs.get());
+        }
+        if let Some(v1) = self.v1() {
+            f.field("max_points", &v1.max_points.get());
+            f.field("max_contours", &v1.max_contours.get());
+            f.field("max_composite_points", &v1.max_composite_points.get());
+            f.field("max_composite_contours", &v1.max_composite_contours.get());
+            f.field("max_zones", &v1.max_zones.get());
+            f.field("max_twilight_points", &v1.max_twilight_points.get());
+            f.field("max_storage", &v1.max_storage.get());
+            f.field("max_function_defs", &v1.max_function_defs.get());
+            f.field("max_instruction_defs", &v1.max_instruction_defs.get());
+            f.field("max_stack_elements", &v1.max_stack_elements.get());
+            f.field("max_size_of_instructions", &v1.max_size_of_instructions.get());
+            f.field("max_component_elements", &v1.max_component_elements.get());
+            f.field("max_component_depth", &v1.max_component_depth.get());
         }
 
-        builder.finish()
+        f.finish()
+    }
+}
+
+// Monomorphize all fmts to the above fmt for Maxp<'a>
+impl std::fmt::Debug for MaxpV0 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Maxp { maxp: self }.fmt(f)
+    }
+}
+impl std::fmt::Debug for MaxpV05 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Maxp { maxp: self }.fmt(f)
+    }
+}
+impl std::fmt::Debug for MaxpV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Maxp { maxp: self }.fmt(f)
     }
 }

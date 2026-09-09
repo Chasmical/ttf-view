@@ -1,4 +1,4 @@
-use crate::{platform::PlatformId, tables::name::NameTableRepr};
+use crate::{platform::PlatformId, tables::name::Name};
 use lcid::{LanguageId as Lcid, LcidLookupError};
 use std::borrow::Cow;
 
@@ -31,7 +31,7 @@ impl LanguageId {
         }
     }
 
-    pub fn tag(&self, table: Option<&NameTableRepr>) -> Option<Cow<'static, str>> {
+    pub fn tag(&self, table: Option<Name<'_>>) -> Option<Cow<'static, str>> {
         Some(match *self {
             Self::Tagged(id) => {
                 Cow::Owned(table?.lang_tags().nth((id & 0x7FFF) as usize)?.string())
@@ -46,7 +46,7 @@ impl LanguageId {
         })
     }
 
-    pub fn english_name(&self, table: Option<&NameTableRepr>) -> Option<Cow<'static, str>> {
+    pub fn english_name(&self, table: Option<Name<'_>>) -> Option<Cow<'static, str>> {
         Some(match *self {
             Self::Tagged(id) => {
                 let lang_tag = table?.lang_tags().nth((id & 0x7FFF) as usize)?.string();

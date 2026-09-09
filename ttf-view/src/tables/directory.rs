@@ -1,5 +1,5 @@
 use crate::{
-    tables::{Table, TableHandle},
+    tables::{RawTable, Table},
     types::{Offset32, Tag, tags, uint16, uint32},
     util::iterator_map,
 };
@@ -48,10 +48,10 @@ impl TableDirectoryRepr {
         Some(TableRecordHandle(self, self.table_record_raw(tag)?))
     }
 
-    pub fn table_raw<T: Table>(&self) -> Option<&T> {
+    pub fn table_raw<T: RawTable>(&self) -> Option<&T> {
         self.table_record(T::TAG)?.table_as()
     }
-    pub fn table<'a, T: TableHandle<'a>>(&'a self) -> Option<T> {
+    pub fn table<'a, T: Table<'a>>(&'a self) -> Option<T> {
         T::in_directory(self)
     }
 
@@ -76,10 +76,10 @@ impl<'a> TableRecordHandle<'a> {
             std::slice::from_raw_parts(start, self.length.get() as _)
         }
     }
-    pub const fn table_as<T: Table>(&self) -> Option<&'a T> {
+    pub const fn table_as<T: RawTable>(&self) -> Option<&'a T> {
         if self.table_tag == T::TAG { Some(unsafe { self.table_as_unchecked() }) } else { None }
     }
-    pub const unsafe fn table_as_unchecked<T: Table>(&self) -> &'a T {
+    pub const unsafe fn table_as_unchecked<T: RawTable>(&self) -> &'a T {
         debug_assert!(self.table_tag == T::TAG);
         unsafe { &*self.table_as_bytes().as_ptr().cast() }
     }

@@ -7,16 +7,29 @@ use std::{borrow::Cow, bstr::ByteStr};
 
 #[repr(C)]
 #[non_exhaustive]
-pub struct NameTableRepr {
+pub struct NameV0 {
     // version ≥ 0:
     pub version: uint16,
     pub count: uint16,
     pub storage_offset: Offset16,
     name_records: [NameRecordRepr; 0],
+}
+#[repr(C)]
+#[non_exhaustive]
+pub struct NameV1 {
+    v0: NameV0,
     // version ≥ 1:
     // : lang_tag_count: uint16,
     // : lang_tag_records: [LangTagRecordRepr; lang_tag_count],
 }
+
+const impl std::ops::Deref for NameV1 {
+    type Target = NameV0;
+    fn deref(&self) -> &Self::Target {
+        &self.v0
+    }
+}
+
 #[repr(C)]
 pub struct NameRecordRepr {
     pub platform_id: uint16,
@@ -32,36 +45,67 @@ pub struct LangTagRecordRepr {
     pub lang_tag_offset: Offset16,
 }
 
-impl super::Table for NameTableRepr {
+impl super::RawTable for NameV0 {
     const TAG: Tag = tags::name;
-    type Handle<'a> = &'a Self;
+}
+impl<'a> super::Table<'a> for Name<'a> {
+    const TAG: Tag = tags::name;
+    fn in_directory(dir: &'a super::TableDirectoryRepr) -> Option<Self> {
+        Some(Self { name: dir.table_raw()? })
+    }
 }
 
-impl NameTableRepr {
-    pub const fn name_records(&self) -> &[NameRecordRepr] {
-        unsafe { std::slice::from_raw_parts(self.name_records.as_ptr(), self.count.get() as _) }
+#[derive(Copy)]
+#[derive_const(Clone)]
+pub struct Name<'a> {
+    name: &'a NameV0,
+}
+
+const impl std::ops::Deref for Name<'_> {
+    type Target = NameV0;
+    fn deref(&self) -> &Self::Target {
+        self.name
     }
+}
+
+impl<'a> Name<'a> {
+    pub const fn version(&self) -> u16 {
+        self.name.version.get()
+    }
+
+    pub const fn v1(&self) -> Option<&'a NameV1> {
+        if self.version() >= 1 {
+            Some(unsafe { std::mem::transmute::<&NameV0, &NameV1>(self.name) })
+        } else {
+            None
+        }
+    }
+
     pub const fn names(&self) -> NamesIter<'_> {
         NamesIter::new(self)
-    }
-
-    // Note: I decided not to include lang_tag_count() getter here, because we've already got
-    // not only a better higher-level API - lang_tags(), but also just lang_tag_records().
-
-    pub const fn lang_tag_records(&self) -> &[LangTagRecordRepr] {
-        if self.version.get() == 0 {
-            return &[];
-        }
-        let len_ptr = self.name_records().as_ptr_range().end.cast::<uint16>();
-        unsafe { std::slice::from_raw_parts(len_ptr.add(1).cast(), (*len_ptr).get() as _) }
     }
     pub const fn lang_tags(&self) -> LangTagsIter<'_> {
         LangTagsIter::new(self)
     }
+}
 
+impl NameV0 {
+    pub const fn name_records(&self) -> &[NameRecordRepr] {
+        unsafe { std::slice::from_raw_parts(self.name_records.as_ptr(), self.count.get() as _) }
+    }
     pub const fn string_storage(&self) -> &StringStorage {
         let offset = self.storage_offset.get() as usize;
         unsafe { &*std::ptr::from_ref(self).byte_add(offset).cast() }
+    }
+}
+
+impl NameV1 {
+    pub const fn lang_tag_count(&self) -> uint16 {
+        unsafe { *self.name_records().as_ptr_range().end.cast::<uint16>() }
+    }
+    pub const fn lang_tag_records(&self) -> &[LangTagRecordRepr] {
+        let len_ptr = self.name_records().as_ptr_range().end.cast::<uint16>();
+        unsafe { std::slice::from_raw_parts(len_ptr.add(1).cast(), (*len_ptr).get() as _) }
     }
 }
 
@@ -79,11 +123,11 @@ impl StringStorage {
 
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct NameHandle<'a>(&'a NameTableRepr, &'a NameRecordRepr);
+pub struct NameHandle<'a>(Name<'a>, &'a NameRecordRepr);
 
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct LangTagHandle<'a>(&'a NameTableRepr, &'a LangTagRecordRepr);
+pub struct LangTagHandle<'a>(Name<'a>, &'a LangTagRecordRepr);
 
 const impl std::ops::Deref for NameHandle<'_> {
     type Target = NameRecordRepr;
@@ -100,7 +144,7 @@ const impl std::ops::Deref for LangTagHandle<'_> {
 
 impl<'a> NameHandle<'a> {
     pub const fn bytes(&self) -> &'a [u8] {
-        unsafe { self.0.string_storage().get(self.1.string_offset.get(), self.1.length.get()) }
+        unsafe { self.0.name.string_storage().get(self.1.string_offset.get(), self.1.length.get()) }
     }
     pub fn string(&self) -> Result<String, EncodingError> {
         let encoding = EncodingId::new(self.1.platform_id.get(), self.1.encoding_id.get())?;
@@ -110,7 +154,9 @@ impl<'a> NameHandle<'a> {
 
 impl<'a> LangTagHandle<'a> {
     pub const fn bytes(&self) -> &'a [u8] {
-        unsafe { self.0.string_storage().get(self.1.lang_tag_offset.get(), self.1.length.get()) }
+        unsafe {
+            self.0.name.string_storage().get(self.1.lang_tag_offset.get(), self.1.length.get())
+        }
     }
     pub fn string(&self) -> String {
         // Note: LangTags are always encoded in UTF-16BE.
@@ -121,12 +167,12 @@ impl<'a> LangTagHandle<'a> {
 // TODO: When std::slice::Iter's Clone is constified, make the derive const
 #[derive(Clone)]
 pub struct NamesIter<'a> {
-    table: &'a NameTableRepr,
+    table: Name<'a>,
     inner: std::slice::Iter<'a, NameRecordRepr>,
 }
 impl<'a> NamesIter<'a> {
-    pub const fn new(table: &'a NameTableRepr) -> Self {
-        Self { table, inner: table.name_records().iter() }
+    pub const fn new(table: &'a Name<'a>) -> Self {
+        Self { table: *table, inner: table.name_records().iter() }
     }
     // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
     pub fn as_records(&self) -> &'a [NameRecordRepr] {
@@ -141,12 +187,12 @@ iterator_map!(NamesIter<'a> {
 // TODO: When std::slice::Iter's Clone is constified, make the derive const
 #[derive(Clone)]
 pub struct LangTagsIter<'a> {
-    table: &'a NameTableRepr,
+    table: Name<'a>,
     inner: std::slice::Iter<'a, LangTagRecordRepr>,
 }
 impl<'a> LangTagsIter<'a> {
-    pub const fn new(table: &'a NameTableRepr) -> Self {
-        Self { table, inner: table.lang_tag_records().iter() }
+    pub const fn new(table: &'a Name<'a>) -> Self {
+        Self { table: *table, inner: table.v1().map_or(&[][..], NameV1::lang_tag_records).iter() }
     }
     // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
     pub fn as_records(&self) -> &'a [LangTagRecordRepr] {
@@ -158,25 +204,33 @@ iterator_map!(LangTagsIter<'a> {
     |this, x| LangTagHandle(this.table, x)
 });
 
-impl std::fmt::Debug for NameTableRepr {
+impl std::fmt::Debug for Name<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut builder = f.debug_struct("NameTable");
+        let mut f = f.debug_struct("NameTable");
 
-        builder
-            .field("version", &self.version.get())
+        f.field("version", &self.version.get())
             .field("count", &self.count.get())
             .field_with("storage_offset", |f| write!(f, "{:#06X}", self.storage_offset))
             .field_with("name_records", |f| f.debug_list().entries(self.names()).finish());
 
-        if self.version.get() != 0 {
-            builder
-                .field("lang_tag_count", &self.lang_tag_records().len())
-                .field_with("lang_tag_records", |f| {
-                    f.debug_list().entries(self.lang_tags()).finish()
-                });
+        if let Some(v1) = self.v1() {
+            f.field("lang_tag_count", &v1.lang_tag_records().len());
+            f.field_with("lang_tag_records", |f| f.debug_list().entries(self.lang_tags()).finish());
         }
 
-        builder.finish()
+        f.finish()
+    }
+}
+
+// Monomorphize all fmts to the above fmt for Name<'a>
+impl std::fmt::Debug for NameV0 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Name { name: self }.fmt(f)
+    }
+}
+impl std::fmt::Debug for NameV1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        Name { name: self }.fmt(f)
     }
 }
 
