@@ -65,6 +65,44 @@ impl<'a> Hhea<'a> {
             None
         }
     }
+
+    // version = 1.x:
+    pub const fn ascender(&self) -> Option<FWORD> {
+        Some(self.v1()?.ascender)
+    }
+    pub const fn descender(&self) -> Option<FWORD> {
+        Some(self.v1()?.descender)
+    }
+    pub const fn line_gap(&self) -> Option<FWORD> {
+        Some(self.v1()?.line_gap)
+    }
+    pub const fn advance_width_max(&self) -> Option<UFWORD> {
+        Some(self.v1()?.advance_width_max)
+    }
+    pub const fn min_left_side_bearing(&self) -> Option<FWORD> {
+        Some(self.v1()?.min_left_side_bearing)
+    }
+    pub const fn min_right_side_bearing(&self) -> Option<FWORD> {
+        Some(self.v1()?.min_right_side_bearing)
+    }
+    pub const fn x_max_extent(&self) -> Option<FWORD> {
+        Some(self.v1()?.x_max_extent)
+    }
+    pub const fn caret_slope_rise(&self) -> Option<int16> {
+        Some(self.v1()?.caret_slope_rise)
+    }
+    pub const fn caret_slope_run(&self) -> Option<int16> {
+        Some(self.v1()?.caret_slope_run)
+    }
+    pub const fn caret_offset(&self) -> Option<int16> {
+        Some(self.v1()?.caret_offset)
+    }
+    pub const fn metric_data_format(&self) -> Option<int16> {
+        Some(self.v1()?.metric_data_format)
+    }
+    pub const fn number_of_h_metrics(&self) -> Option<uint16> {
+        Some(self.v1()?.number_of_h_metrics)
+    }
 }
 
 impl std::fmt::Debug for Hhea<'_> {

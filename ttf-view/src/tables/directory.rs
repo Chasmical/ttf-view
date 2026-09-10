@@ -44,8 +44,8 @@ impl TableDirectoryRepr {
     pub const fn table_records(&self) -> TableRecordsIter<'_> {
         TableRecordsIter::new(self)
     }
-    pub fn table_record(&self, tag: Tag) -> Option<TableRecordHandle<'_>> {
-        Some(TableRecordHandle(self, self.table_record_raw(tag)?))
+    pub fn table_record(&self, tag: Tag) -> Option<TableRecord<'_>> {
+        Some(TableRecord(self, self.table_record_raw(tag)?))
     }
 
     pub fn table_raw<T: RawTable>(&self) -> Option<&T> {
@@ -60,16 +60,16 @@ impl TableDirectoryRepr {
 
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct TableRecordHandle<'a>(&'a TableDirectoryRepr, &'a TableRecordRepr);
+pub struct TableRecord<'a>(&'a TableDirectoryRepr, &'a TableRecordRepr);
 
-const impl std::ops::Deref for TableRecordHandle<'_> {
+const impl std::ops::Deref for TableRecord<'_> {
     type Target = TableRecordRepr;
     fn deref(&self) -> &Self::Target {
         self.1
     }
 }
 
-impl<'a> TableRecordHandle<'a> {
+impl<'a> TableRecord<'a> {
     pub const fn table_as_bytes(&self) -> &'a [u8] {
         unsafe {
             let start = std::ptr::from_ref(self.0).cast::<u8>().add(self.offset.get() as _);
@@ -123,8 +123,8 @@ impl<'a> TableRecordsIter<'a> {
     }
 }
 iterator_map!(TableRecordsIter<'a> {
-    type Item = TableRecordHandle<'a>;
-    |this, x| TableRecordHandle(this.dir, x)
+    type Item = TableRecord<'a>;
+    |this, x| TableRecord(this.dir, x)
 });
 
 impl std::fmt::Debug for TableDirectoryRepr {
@@ -158,7 +158,7 @@ impl std::fmt::Debug for TableRecordRepr {
             .finish()
     }
 }
-impl std::fmt::Debug for TableRecordHandle<'_> {
+impl std::fmt::Debug for TableRecord<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         TableRecordRepr::fmt(self, f)
     }

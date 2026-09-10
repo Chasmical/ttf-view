@@ -70,15 +70,15 @@ impl CmapV0 {
 
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct EncodingHandle<'a>(&'a CmapV0, &'a EncodingRecordRepr);
+pub struct EncodingRecord<'a>(&'a CmapV0, &'a EncodingRecordRepr);
 
-const impl std::ops::Deref for EncodingHandle<'_> {
+const impl std::ops::Deref for EncodingRecord<'_> {
     type Target = EncodingRecordRepr;
     fn deref(&self) -> &Self::Target {
         self.1
     }
 }
-impl<'a> EncodingHandle<'a> {
+impl<'a> EncodingRecord<'a> {
     pub const fn subtable(&self) -> &'a CmapSubtableRepr {
         let offset = self.1.subtable_offset.get() as _;
         unsafe { &*std::ptr::from_ref(self.0).cast::<u8>().byte_add(offset).cast() }
@@ -100,8 +100,8 @@ impl<'a> EncodingsIter<'a> {
     }
 }
 iterator_map!(EncodingsIter<'a> {
-    type Item = EncodingHandle<'a>;
-    |this, x| EncodingHandle(this.cmap, x)
+    type Item = EncodingRecord<'a>;
+    |this, x| EncodingRecord(this.cmap, x)
 });
 
 #[repr(C)]

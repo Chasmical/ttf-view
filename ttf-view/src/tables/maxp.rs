@@ -81,6 +81,52 @@ impl<'a> Maxp<'a> {
             None
         }
     }
+
+    // version ≥ 0.5:
+    pub const fn num_glyphs(&self) -> Option<uint16> {
+        Some(self.v05()?.num_glyphs)
+    }
+
+    // version ≥ 1.0:
+    pub const fn max_points(&self) -> Option<uint16> {
+        Some(self.v1()?.max_points)
+    }
+    pub const fn max_contours(&self) -> Option<uint16> {
+        Some(self.v1()?.max_contours)
+    }
+    pub const fn max_composite_points(&self) -> Option<uint16> {
+        Some(self.v1()?.max_composite_points)
+    }
+    pub const fn max_composite_contours(&self) -> Option<uint16> {
+        Some(self.v1()?.max_composite_contours)
+    }
+    pub const fn max_zones(&self) -> Option<uint16> {
+        Some(self.v1()?.max_zones)
+    }
+    pub const fn max_twilight_points(&self) -> Option<uint16> {
+        Some(self.v1()?.max_twilight_points)
+    }
+    pub const fn max_storage(&self) -> Option<uint16> {
+        Some(self.v1()?.max_storage)
+    }
+    pub const fn max_function_defs(&self) -> Option<uint16> {
+        Some(self.v1()?.max_function_defs)
+    }
+    pub const fn max_instruction_defs(&self) -> Option<uint16> {
+        Some(self.v1()?.max_instruction_defs)
+    }
+    pub const fn max_stack_elements(&self) -> Option<uint16> {
+        Some(self.v1()?.max_stack_elements)
+    }
+    pub const fn max_size_of_instructions(&self) -> Option<uint16> {
+        Some(self.v1()?.max_size_of_instructions)
+    }
+    pub const fn max_component_elements(&self) -> Option<uint16> {
+        Some(self.v1()?.max_component_elements)
+    }
+    pub const fn max_component_depth(&self) -> Option<uint16> {
+        Some(self.v1()?.max_component_depth)
+    }
 }
 
 impl std::fmt::Debug for Maxp<'_> {
