@@ -3,7 +3,7 @@
 #![allow(incomplete_features)]
 use std::{
     fmt::Debug,
-    io::{Write, stdout},
+    io::{BufWriter, Write, stdout},
 };
 use termal::{eprintac, printac, printacln};
 use ttf_view::{
@@ -173,7 +173,9 @@ macro_rules! implement_tables {
                     if !table.debug_is_supported() {
                         error_exit!("debug format is not yet implemented for '{}'", tag.unwrap());
                     }
-                    println!("{:#?}", std::fmt::from_fn(|f| table.debug_dump(f)));
+                    let mut out = BufWriter::new(stdout());
+                    writeln!(out, "{:#?}", std::fmt::from_fn(|f| table.debug_dump(f))).unwrap();
+                    out.flush().unwrap();
                 },
                 Format::Json => {
                     error_exit!("json format is not implemented yet");
