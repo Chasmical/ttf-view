@@ -1,5 +1,5 @@
 [package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 name = "ttf-view"
 description = "A TrueType/OpenType font parsing/viewing library and a CLI tool."
@@ -12,11 +12,11 @@ readme = "../README.md"
 
 [dependencies]
 chrono = "0.4.45"
-encoding_rs = { version = "0.8.35", optional = true }
+encoding_rs = { version = "0.8.41", optional = true }
 lcid = "0.3.0"
 termal = { version = "5.1.1", optional = true }
 thiserror = "2.0.20"
-zerocopy = "0.8.56"
+zerocopy = "0.8.57"
 
 [features]
 default = ["non-standard-encodings"]
