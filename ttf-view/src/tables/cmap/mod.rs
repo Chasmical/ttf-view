@@ -1,4 +1,5 @@
 use crate::{
+    tables::{Table, TableDirectory, TableError},
     types::{Offset32, Tag, tags, uint16, uint32},
     util::iterator_map,
 };
@@ -36,13 +37,44 @@ pub struct EncodingRecordRaw {
     pub subtable_offset: Offset32,
 }
 
-impl super::RawTable for CmapV0 {
+impl<'a> Table<'a> for Cmap<'a> {
     const TAG: Tag = tags::cmap;
-}
-impl<'a> super::Table<'a> for Cmap<'a> {
-    const TAG: Tag = tags::cmap;
-    fn in_directory(dir: &'a super::TableDirectory) -> Option<Self> {
-        Some(Self { cmap: dir.table_raw()? })
+    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+        let rec = dir.table_record(Self::TAG).ok_or(TableError::NotFound)?;
+        let v0 = rec.raw_as::<CmapV0>().ok_or(TableError::InvalidLen)?;
+
+        let required_len =
+            size_of::<CmapV0>() + v0.num_tables.get() as usize * size_of::<EncodingRecordRaw>();
+        // Validate that all encoding records are in range
+        if (rec.length.get() as usize) < required_len {
+            return Err(TableError::InvalidLen);
+        }
+
+        for encoding in v0.encodings() {
+            // Validate that this subtable's format is in range
+            let subtable_offset = encoding.subtable_offset.get() as usize;
+            if (rec.length.get() as usize) < subtable_offset + size_of::<uint16>() {
+                return Err(TableError::InvalidLen);
+            }
+            // Calculate this subtable format's header length
+            let subtable = encoding.subtable();
+            let header_len = match subtable.format() {
+                0 | 2 | 4 | 6 => size_of::<ShortMeta>(),
+                8 | 10 | 12 | 13 => size_of::<LongMeta>(),
+                14 => size_of::<LenOnlyMeta>(),
+                _ => 2,
+            };
+            // Validate that this subtable's header is in range
+            if (rec.length.get() as usize) < subtable_offset + header_len {
+                return Err(TableError::InvalidLen);
+            }
+            // Validate that all of this subtable's data is in range
+            if (rec.length.get() as usize) < subtable_offset + subtable.length().unwrap() as usize {
+                return Err(TableError::InvalidLen);
+            }
+        }
+
+        Ok(Self { cmap: v0 })
     }
 }
 

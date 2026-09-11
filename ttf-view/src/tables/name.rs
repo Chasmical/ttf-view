@@ -1,5 +1,6 @@
 use crate::{
     platform::{EncodingError, EncodingId, PlatformId},
+    tables::{Table, TableDirectory, TableError},
     types::{Offset16, Tag, tags, uint16},
     util::iterator_map,
 };
@@ -43,13 +44,54 @@ pub struct LangTagRecordRaw {
     pub lang_tag_offset: Offset16,
 }
 
-impl super::RawTable for NameV0 {
+impl<'a> Table<'a> for Name<'a> {
     const TAG: Tag = tags::name;
-}
-impl<'a> super::Table<'a> for Name<'a> {
-    const TAG: Tag = tags::name;
-    fn in_directory(dir: &'a super::TableDirectory) -> Option<Self> {
-        Some(Self { name: dir.table_raw()? })
+    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+        let rec = dir.table_record(Self::TAG).ok_or(TableError::NotFound)?;
+        let v0 = rec.raw_as::<NameV0>().ok_or(TableError::InvalidLen)?;
+
+        let mut required_len =
+            size_of::<NameV0>() + v0.count.get() as usize * size_of::<NameRecordRaw>();
+        // Validate that all name records are in range
+        if (rec.length.get() as usize) < required_len {
+            return Err(TableError::InvalidLen);
+        }
+
+        let storage_offset = v0.storage_offset.get() as u32;
+
+        // Validate that all names are in range
+        for name in v0.name_records() {
+            let offset = (name.string_offset.get() as u32) + (name.length.get() as u32);
+            if rec.length.get() < storage_offset + offset {
+                return Err(TableError::InvalidLen);
+            }
+        }
+
+        if v0.version.get() >= 1 {
+            required_len += size_of::<uint16>(); // lang_tag_count
+            // Validate that lang_tag_count is in range
+            if (rec.length.get() as usize) < required_len {
+                return Err(TableError::InvalidLen);
+            }
+
+            let v1 = rec.raw_as::<NameV1>().unwrap();
+            required_len += v1.lang_tag_count().get() as usize * size_of::<LangTagRecordRaw>();
+
+            // Validate that all lang tag records are in range
+            if (rec.length.get() as usize) < required_len {
+                return Err(TableError::InvalidLen);
+            }
+
+            // Validate that all lang tags are in range
+            for tag in v1.lang_tag_records() {
+                let offset = (tag.lang_tag_offset.get() as u32) + (tag.length.get() as u32);
+                if rec.length.get() < storage_offset + offset {
+                    return Err(TableError::InvalidLen);
+                }
+            }
+        }
+
+        Ok(Self { name: v0 })
     }
 }
 

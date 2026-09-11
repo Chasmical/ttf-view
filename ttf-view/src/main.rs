@@ -113,7 +113,7 @@ fn main() {
             Err(err) => error_exit!("{} '{}'", err, &path),
         });
         font_data.as_ref().map(|data| {
-            return unsafe { TableDirectory::new_unchecked(&data) };
+            return TableDirectory::new(&data).expect("Font should be well-formed");
         })
     };
 
@@ -151,7 +151,7 @@ macro_rules! implement_tables {
                 None => $dir,
                 Some(DIR_TAG) if $dir.table_record_raw(DIR_TAG).is_none() => $dir,
 
-                $($( Some($tag) => &$get_table.unwrap(), )?)*
+                $($( Some($tag) => &$get_table.expect("Table should be well-formed"), )?)*
 
                 Some(table_tag @ _) => {
                     if table_tag.is_known() {

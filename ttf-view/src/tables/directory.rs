@@ -1,5 +1,5 @@
 use crate::{
-    tables::{RawTable, Table},
+    tables::{Table, TableError},
     types::{Offset32, Tag, tags, uint16, uint32},
     util::iterator_map,
 };
@@ -23,6 +23,30 @@ pub struct TableRecordRaw {
 }
 
 impl TableDirectory {
+    pub fn new(bytes: &[u8]) -> Result<&Self, TableError> {
+        // Validate that table directory is in range
+        if bytes.len() < size_of::<TableDirectory>() {
+            return Err(TableError::InvalidLen);
+        }
+        let dir = unsafe { Self::new_unchecked(bytes) };
+
+        // Validate that all table records are in range
+        let required_len = size_of::<TableDirectory>()
+            + dir.num_tables.get() as usize * size_of::<TableRecordRaw>();
+        if bytes.len() < required_len {
+            return Err(TableError::InvalidLen);
+        }
+
+        // Validate that every table's data is in range
+        for table in dir.table_records_raw() {
+            let offset = table.offset.get() as usize + table.length.get() as usize;
+            if bytes.len() < offset {
+                return Err(TableError::InvalidLen);
+            }
+        }
+
+        Ok(dir)
+    }
     pub const unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
         unsafe { &*bytes.as_ptr().cast() }
     }
@@ -48,11 +72,8 @@ impl TableDirectory {
         Some(TableRecord(self, self.table_record_raw(tag)?))
     }
 
-    pub fn table_raw<T: RawTable>(&self) -> Option<&T> {
-        self.table_record(T::TAG)?.table_as()
-    }
-    pub fn table<'a, T: Table<'a>>(&'a self) -> Option<T> {
-        T::in_directory(self)
+    pub fn table<'a, T: Table<'a>>(&'a self) -> Result<T, TableError> {
+        T::new_in(self)
     }
 
     // Note: see src/tables/mod.rs for specific table methods
@@ -76,12 +97,16 @@ impl<'a> TableRecord<'a> {
             std::slice::from_raw_parts(start, self.length.get() as _)
         }
     }
-    pub const fn table_as<T: RawTable>(&self) -> Option<&'a T> {
-        if self.table_tag == T::TAG { Some(unsafe { self.table_as_unchecked() }) } else { None }
+    pub fn table_as<T: Table<'a>>(&self) -> Result<T, TableError> {
+        T::new_in(self.0)
     }
-    pub const unsafe fn table_as_unchecked<T: RawTable>(&self) -> &'a T {
-        debug_assert!(self.table_tag == T::TAG);
-        unsafe { &*self.table_as_bytes().as_ptr().cast() }
+
+    pub(crate) fn raw_as<T>(&self) -> Option<&'a T> {
+        if self.length.get() >= size_of::<T>() as u32 {
+            Some(unsafe { &*self.table_as_bytes().as_ptr().cast() })
+        } else {
+            None
+        }
     }
 
     pub fn calculate_checksum(&self) -> u32 {

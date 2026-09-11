@@ -1,4 +1,7 @@
-use crate::types::{Fixed, LongDateTime, Tag, int16, tags, uint16, uint32};
+use crate::{
+    tables::{Table, TableDirectory, TableError},
+    types::{Fixed, LongDateTime, Tag, int16, tags, uint16, uint32},
+};
 
 #[repr(C)]
 pub struct HeadV0 {
@@ -36,13 +39,22 @@ const impl std::ops::Deref for HeadV1 {
     }
 }
 
-impl super::RawTable for HeadV0 {
+impl<'a> Table<'a> for Head<'a> {
     const TAG: Tag = tags::head;
-}
-impl<'a> super::Table<'a> for Head<'a> {
-    const TAG: Tag = tags::head;
-    fn in_directory(dir: &'a super::TableDirectory) -> Option<Self> {
-        Some(Self { head: dir.table_raw()? })
+    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+        let rec = dir.table_record(Self::TAG).ok_or(TableError::NotFound)?;
+        let v0 = rec.raw_as::<HeadV0>().ok_or(TableError::InvalidLen)?;
+
+        let required_len = match v0.major_version.get() {
+            0 => size_of::<HeadV0>() as u32,
+            1 => size_of::<HeadV1>() as u32,
+            _ => return Err(TableError::UnknownVersion),
+        };
+        if rec.length.get() < required_len {
+            return Err(TableError::InvalidLen);
+        }
+
+        Ok(Self { head: v0 })
     }
 }
 

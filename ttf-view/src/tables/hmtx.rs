@@ -1,5 +1,5 @@
 use crate::{
-    tables::{TableDirectory, cmap::GlyphId},
+    tables::{Table, TableDirectory, TableError, cmap::GlyphId},
     types::{FWORD, Tag, UFWORD, tags},
 };
 
@@ -20,20 +20,34 @@ pub struct LongHorMetricRaw {
     pub lsb: FWORD,
 }
 
-impl super::RawTable for HmtxRaw {
-    const TAG: Tag = tags::head;
-}
-impl<'a> super::Table<'a> for Hmtx<'a> {
+impl<'a> Table<'a> for Hmtx<'a> {
     const TAG: Tag = tags::hmtx;
-    fn in_directory(dir: &'a TableDirectory) -> Option<Self> {
-        let raw_words = dir.table_raw::<HmtxRaw>()?.raw_words.as_ptr();
-        let num_h_metrics = dir.hhea()?.v1()?.number_of_h_metrics.get() as usize;
-        let num_glyphs = dir.maxp()?.v05()?.num_glyphs.get() as usize;
+    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+        let rec = dir.table_record(Self::TAG).ok_or(TableError::NotFound)?;
+        let raw_words = rec.raw_as::<HmtxRaw>().unwrap().raw_words.as_ptr();
+
+        let num_h_metrics = dir
+            .hhea()
+            .map_err(|_| TableError::Dependency(tags::hhea))?
+            .number_of_h_metrics()
+            .ok_or(TableError::DependencyError(&"number_of_h_metrics not found"))?
+            .get() as usize;
+
+        let num_glyphs = dir
+            .maxp()
+            .map_err(|_| TableError::Dependency(tags::maxp))?
+            .num_glyphs()
+            .ok_or(TableError::DependencyError(&"num_glyphs not found"))?
+            .get() as usize;
 
         let total_word_count = num_h_metrics + num_glyphs;
         let raw_words = unsafe { std::slice::from_raw_parts(raw_words, total_word_count) };
 
-        Some(Self { raw_words, num_h_metrics })
+        if (rec.length.get() as usize) < total_word_count * size_of::<FWORD>() {
+            return Err(TableError::InvalidLen);
+        }
+
+        Ok(Self { raw_words, num_h_metrics })
     }
 }
 

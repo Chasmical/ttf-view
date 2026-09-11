@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
 use crate::{
-    tables::TableDirectory,
+    tables::{Table, TableDirectory, TableError},
     types::{FWORD, Tag, UFWORD, int16, tags, uint16, uint32},
 };
 
@@ -105,14 +105,23 @@ const impl std::ops::Deref for Os_2V5 {
     }
 }
 
-impl super::RawTable for Os_2Base {
+impl<'a> Table<'a> for Os_2<'a> {
     const TAG: Tag = tags::OS_2;
-}
-impl<'a> super::Table<'a> for Os_2<'a> {
-    const TAG: Tag = tags::OS_2;
-    fn in_directory(dir: &'a TableDirectory) -> Option<Self> {
-        let record = dir.table_record(tags::OS_2)?;
-        Some(Self { base: record.table_as()?, len: record.length.get() })
+    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+        let rec = dir.table_record(tags::OS_2).ok_or(TableError::NotFound)?;
+        let base = rec.raw_as::<Os_2Base>().ok_or(TableError::InvalidLen)?;
+
+        let required_len = match base.version.get() {
+            0 => size_of::<Os_2Base>() as u32,
+            1..=3 => size_of::<Os_2V1>() as u32,
+            4 => size_of::<Os_2V4>() as u32,
+            5.. => size_of::<Os_2V5>() as u32,
+        };
+        if rec.length.get() < required_len {
+            return Err(TableError::InvalidLen);
+        }
+
+        Ok(Self { base, len: rec.length.get() })
     }
 }
 

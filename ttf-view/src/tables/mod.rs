@@ -11,35 +11,49 @@ pub mod maxp;
 pub mod name;
 pub mod os_2;
 
-pub trait RawTable {
-    const TAG: Tag;
-}
-pub trait Table<'a>: Sized {
-    const TAG: Tag;
-    fn in_directory(dir: &'a TableDirectory) -> Option<Self>;
-}
-
 impl TableDirectory {
     // Note: Even though these tables are required, we'll still use Option here
-    pub fn cmap(&self) -> Option<cmap::Cmap<'_>> {
+    pub fn cmap(&self) -> Result<cmap::Cmap<'_>, TableError> {
         self.table()
     }
-    pub fn head(&self) -> Option<head::Head<'_>> {
+    pub fn head(&self) -> Result<head::Head<'_>, TableError> {
         self.table()
     }
-    pub fn hhea(&self) -> Option<hhea::Hhea<'_>> {
+    pub fn hhea(&self) -> Result<hhea::Hhea<'_>, TableError> {
         self.table()
     }
-    pub fn hmtx(&self) -> Option<hmtx::Hmtx<'_>> {
+    pub fn hmtx(&self) -> Result<hmtx::Hmtx<'_>, TableError> {
         self.table()
     }
-    pub fn maxp(&self) -> Option<maxp::Maxp<'_>> {
+    pub fn maxp(&self) -> Result<maxp::Maxp<'_>, TableError> {
         self.table()
     }
-    pub fn name(&self) -> Option<name::Name<'_>> {
+    pub fn name(&self) -> Result<name::Name<'_>, TableError> {
         self.table()
     }
-    pub fn os_2(&self) -> Option<os_2::Os_2<'_>> {
+    pub fn os_2(&self) -> Result<os_2::Os_2<'_>, TableError> {
         self.table()
     }
+}
+
+pub trait Table<'a>: Sized {
+    const TAG: Tag;
+    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError>;
+}
+
+#[derive(Debug, thiserror::Error)]
+#[derive_const(Clone, PartialEq, Eq)]
+pub enum TableError {
+    #[error("table not found")]
+    NotFound,
+    #[error("unknown version")]
+    UnknownVersion,
+    #[error("dependency '{0}'")]
+    Dependency(Tag),
+    #[error("dependency: {0}")]
+    DependencyError(&'static &'static str),
+    #[error("invalid length")]
+    InvalidLen,
+    #[error("malformed: {0}")]
+    Malformed(&'static &'static str),
 }

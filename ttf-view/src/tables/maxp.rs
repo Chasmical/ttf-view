@@ -1,4 +1,7 @@
-use crate::types::{Tag, Version16Dot16, tags, uint16};
+use crate::{
+    tables::{Table, TableDirectory, TableError},
+    types::{Tag, Version16Dot16, tags, uint16},
+};
 
 #[repr(C)]
 pub struct MaxpV0 {
@@ -44,13 +47,23 @@ const impl std::ops::Deref for MaxpV1 {
     }
 }
 
-impl super::RawTable for MaxpV0 {
+impl<'a> Table<'a> for Maxp<'a> {
     const TAG: Tag = tags::maxp;
-}
-impl<'a> super::Table<'a> for Maxp<'a> {
-    const TAG: Tag = tags::maxp;
-    fn in_directory(dir: &'a super::TableDirectory) -> Option<Self> {
-        Some(Self { maxp: dir.table_raw()? })
+    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+        let rec = dir.table_record(Self::TAG).ok_or(TableError::NotFound)?;
+        let v0 = rec.raw_as::<MaxpV0>().ok_or(TableError::InvalidLen)?;
+
+        let required_len = match v0.version.tuple() {
+            (0, ..=4) => size_of::<MaxpV0>() as u32,
+            (0, 5..) => size_of::<MaxpV05>() as u32,
+            (1, _) => size_of::<MaxpV1>() as u32,
+            _ => return Err(TableError::UnknownVersion),
+        };
+        if rec.length.get() < required_len {
+            return Err(TableError::InvalidLen);
+        }
+
+        Ok(Self { maxp: v0 })
     }
 }
 

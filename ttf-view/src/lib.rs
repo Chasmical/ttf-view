@@ -7,35 +7,34 @@
 //!
 //! - Two-byte codepoint mappings (other crates only support Unicode).
 //! - Supports more character encodings (such as Shift JIS, GB 18030, Big5, EUC-KR).
+//! - Provides raw low-level access to all structures (with &, and not just getters).
 //! - Faster and easier access to metrics in the 'hmtx' table.
-//! - Actually implements 'cmap' format 2 subtable.
+//! - Actually implements the 'cmap' format 2 subtable (deprecated, but still used by some fonts).
 //!
-//! Also, while not implemented yet, validation of the table data will only happen once - when you
-//! load the font, instead doing bounds-checks on every single field access like `ttf-parser` and
-//! `read-fonts` do, for some reason.
+//! Just like `ttf-parser` and `read-fonts`, this is zero-copy and no-alloc too. Also, validation of
+//! the table data only happens when you access the table (`dir.hmtx()`), instead of doing bounds
+//! checks on every single field access like `ttf-parser` and `read-fonts` do, for some reason.
 //!
-//! The documentation will also be better, more descriptive and with examples and stuff. I want the
-//! entire crate to be comprehensible through documentation alone, without the need to look through
-//! what the language server shows you a type can do.
+//! The documentation will also be better, more descriptive and with examples. I want the entire
+//! crate to be comprehensible through documentation alone, without the need to look through what
+//! the language server shows you a type can do.
 //!
 //! # Reading a font file
 //!
-//! Loading fonts in a safe manner is not implemented yet, so you'll need to use `unsafe`.
-//! It will not perform any validation or bounds checks, and may cause memory access violation.
-//! But, as long as the font file is well-formed, there shouldn't be any issues.
+//! [`TableDirectory`][tables::TableDirectory] is the entry point and main hub for OpenType tables.
+//! Use [`TableDirectory::new(bytes)`][tables::TableDirectory::new] to read a font file. Note that
+//! the validation of specific tables happens separately and is not cached.
 //!
 //! ```no_run
 //! use ttf_view::tables::TableDirectory;
 //!
 //! let data = std::fs::read("MyFont.ttf").unwrap();
-//! let dir = unsafe { TableDirectory::new_unchecked(&data) };
+//! let dir = TableDirectory::new(&data).expect("font should be well-formed");
 //!
-//! if let Some(cmap) = dir.cmap() {
+//! if let Ok(cmap) = dir.cmap() {
 //!     // ...
 //! }
 //! ```
-//!
-//! [`TableDirectory`] is the entry point and the main hub for OpenType tables.
 //!
 //! See the [`tables`] module for more information about tables that you can access.
 //!
@@ -48,9 +47,13 @@
 //! fields exactly as specified by OpenType. Additionally, each version of the table automatically
 //! dereferences to the previous version, e.g. `Os_2V1` to `Os_2V0`, `Os_2V0` to `Os_2Base`.
 //!
-//! ```ignore
+//! ```no_run
+//! # use ttf_view::tables::{TableDirectory, os_2::Os_2};
+//! # let data = std::fs::read("MyFont.ttf").unwrap();
+//! # let dir = unsafe { TableDirectory::new_unchecked(&data) };
+//! #
 //! let os_2: Os_2<'_> = dir.os_2().unwrap();
-//! println!("Vendor ID: {}", os_2.ach_vendor_id); // a field in Os_2Base
+//! println!("Vendor ID: {}", os_2.ach_vend_id); // a field in Os_2Base
 //!
 //! if let Some(v4) = os_2.v4() { // v4 is &Os_2V4
 //!     println!("Last char idx: {}", v4.us_last_char_index); // a field in Os_2Base
@@ -64,7 +67,14 @@
 //! can't provide the actual table's data. But [`TableRecord`](tables::TableRecord) is a
 //! higher-level wrapper which does have a reference to the font, and can provide its table's data.
 //!
-//! ```ignore
+//! ```no_run
+//! # use ttf_view::{
+//! #     tables::{TableDirectory, TableRecord, TableRecordRaw, head::Head},
+//! #     types::tags,
+//! # };
+//! # let data = std::fs::read("MyFont.ttf").unwrap();
+//! # let dir = unsafe { TableDirectory::new_unchecked(&data) };
+//! #
 //! let record_raw: &TableRecordRaw = dir.table_record_raw(tags::head).unwrap();
 //! // can access fields just fine
 //! println!("'head' length: {}", record_raw.length);
@@ -80,7 +90,6 @@
 //! let head = record.table_as::<Head<'_>>().unwrap();
 //! ```
 //!
-//! [`TableDirectory`]: tables::TableDirectory
 //! [`ttf-parser`]: https://docs.rs/ttf-parser/latest/ttf_parser/
 //! [`read-fonts`]: https://docs.rs/read-fonts/latest/read_fonts/
 

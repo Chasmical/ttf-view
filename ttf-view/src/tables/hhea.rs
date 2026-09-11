@@ -1,4 +1,7 @@
-use crate::types::{FWORD, Tag, UFWORD, int16, tags, uint16};
+use crate::{
+    tables::{Table, TableDirectory, TableError},
+    types::{FWORD, Tag, UFWORD, int16, tags, uint16},
+};
 
 #[repr(C)]
 pub struct HheaV0 {
@@ -36,13 +39,22 @@ const impl std::ops::Deref for HheaV1 {
     }
 }
 
-impl super::RawTable for HheaV0 {
+impl<'a> Table<'a> for Hhea<'a> {
     const TAG: Tag = tags::hhea;
-}
-impl<'a> super::Table<'a> for Hhea<'a> {
-    const TAG: Tag = tags::hhea;
-    fn in_directory(dir: &'a super::TableDirectory) -> Option<Self> {
-        Some(Self { hhea: dir.table_raw()? })
+    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+        let rec = dir.table_record(Self::TAG).ok_or(TableError::NotFound)?;
+        let v0 = rec.raw_as::<HheaV0>().ok_or(TableError::InvalidLen)?;
+
+        let required_len = match v0.major_version.get() {
+            0 => size_of::<HheaV0>() as u32,
+            1 => size_of::<HheaV1>() as u32,
+            _ => return Err(TableError::UnknownVersion),
+        };
+        if rec.length.get() < required_len {
+            return Err(TableError::InvalidLen);
+        }
+
+        Ok(Self { hhea: v0 })
     }
 }
 
