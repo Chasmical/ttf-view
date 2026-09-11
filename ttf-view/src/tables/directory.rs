@@ -11,10 +11,10 @@ pub struct TableDirectory {
     pub search_range: uint16,
     pub entry_selector: uint16,
     pub range_shift: uint16,
-    table_records: [TableRecord; 0],
+    table_records: [TableRecordRaw; 0],
 }
 #[repr(C)]
-pub struct TableRecord {
+pub struct TableRecordRaw {
     _exhaustive_but_dont_instantiate: (),
     pub table_tag: Tag,
     pub checksum: uint32,
@@ -33,19 +33,19 @@ impl TableDirectory {
         unsafe { std::slice::from_ptr_range(start..end) }
     }
 
-    pub const fn table_records_raw(&self) -> &[TableRecord] {
+    pub const fn table_records_raw(&self) -> &[TableRecordRaw] {
         let len = self.num_tables.get() as usize;
         unsafe { std::slice::from_raw_parts(self.table_records.as_ptr(), len) }
     }
-    pub fn table_record_raw(&self, tag: Tag) -> Option<&TableRecord> {
+    pub fn table_record_raw(&self, tag: Tag) -> Option<&TableRecordRaw> {
         self.table_records_raw().iter().find(|x| x.table_tag == tag)
     }
 
     pub const fn table_records(&self) -> TableRecordsIter<'_> {
         TableRecordsIter::new(self)
     }
-    pub fn table_record(&self, tag: Tag) -> Option<TableHandle<'_>> {
-        Some(TableHandle(self, self.table_record_raw(tag)?))
+    pub fn table_record(&self, tag: Tag) -> Option<TableRecord<'_>> {
+        Some(TableRecord(self, self.table_record_raw(tag)?))
     }
 
     pub fn table_raw<T: RawTable>(&self) -> Option<&T> {
@@ -60,16 +60,16 @@ impl TableDirectory {
 
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct TableHandle<'a>(&'a TableDirectory, &'a TableRecord);
+pub struct TableRecord<'a>(&'a TableDirectory, &'a TableRecordRaw);
 
-const impl<'a> std::ops::Deref for TableHandle<'a> {
-    type Target = &'a TableRecord;
+const impl<'a> std::ops::Deref for TableRecord<'a> {
+    type Target = &'a TableRecordRaw;
     fn deref(&self) -> &Self::Target {
         &self.1
     }
 }
 
-impl<'a> TableHandle<'a> {
+impl<'a> TableRecord<'a> {
     pub const fn table_as_bytes(&self) -> &'a [u8] {
         unsafe {
             let start = std::ptr::from_ref(self.0).cast::<u8>().add(self.offset.get() as _);
@@ -111,20 +111,20 @@ impl<'a> TableHandle<'a> {
 #[derive(Clone)]
 pub struct TableRecordsIter<'a> {
     dir: &'a TableDirectory,
-    inner: std::slice::Iter<'a, TableRecord>,
+    inner: std::slice::Iter<'a, TableRecordRaw>,
 }
 impl<'a> TableRecordsIter<'a> {
     pub const fn new(dir: &'a TableDirectory) -> Self {
         Self { dir, inner: dir.table_records_raw().iter() }
     }
     // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
-    pub fn as_records(&self) -> &'a [TableRecord] {
+    pub fn as_records(&self) -> &'a [TableRecordRaw] {
         self.inner.as_slice()
     }
 }
 iterator_map!(TableRecordsIter<'a> {
-    type Item = TableHandle<'a>;
-    |this, x| TableHandle(this.dir, x)
+    type Item = TableRecord<'a>;
+    |this, x| TableRecord(this.dir, x)
 });
 
 impl std::fmt::Debug for TableDirectory {
@@ -148,7 +148,7 @@ impl std::fmt::Debug for TableDirectory {
             .finish()
     }
 }
-impl std::fmt::Debug for TableRecord {
+impl std::fmt::Debug for TableRecordRaw {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("TableRecord")
             .field("table_tag", &self.table_tag)
@@ -158,8 +158,8 @@ impl std::fmt::Debug for TableRecord {
             .finish()
     }
 }
-impl std::fmt::Debug for TableHandle<'_> {
+impl std::fmt::Debug for TableRecord<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        TableRecord::fmt(self, f)
+        TableRecordRaw::fmt(self, f)
     }
 }

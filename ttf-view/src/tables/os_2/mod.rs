@@ -14,7 +14,8 @@ pub use unicode_ranges::*;
 
 #[repr(C)]
 pub struct Os_2Base {
-    // version ≥ 0:
+    _exhaustive_but_dont_instantiate: (),
+    // version any:
     pub version: uint16,
     pub x_avg_char_width: FWORD,
     pub us_weight_class: uint16,
@@ -44,6 +45,7 @@ pub struct Os_2Base {
 #[repr(C)]
 pub struct Os_2V0 {
     base: Os_2Base,
+    // version ≥ 0:
     // Apple's docs attribute these 5 fields to v1 instead of v0, so they could be missing in
     // some malformed fonts. For the purposes of versioning such a table is considered Os_2Base,
     // and you need to explicitly check that a table is a properly defined v0 table.

@@ -39,6 +39,47 @@
 //!
 //! See the [`tables`] module for more information about tables that you can access.
 //!
+//! # Notes on how to access tables
+//!
+//! A table should generally be accessed through a type like [`Os_2<'_>`](tables::os_2::Os_2). This
+//! type automatically dereferences to [`Os_2Base`][tables::os_2::Os_2Base], which contains fields
+//! that are available in all versions of `'OS/2'` table. You can access specific versions of the
+//! table through methods like `v0`, `v1`, `v4` on it, which return references to the raw data with
+//! fields exactly as specified by OpenType. Additionally, each version of the table automatically
+//! dereferences to the previous version, e.g. `Os_2V1` to `Os_2V0`, `Os_2V0` to `Os_2Base`.
+//!
+//! ```ignore
+//! let os_2: Os_2<'_> = dir.os_2().unwrap();
+//! println!("Vendor ID: {}", os_2.ach_vendor_id); // a field in Os_2Base
+//!
+//! if let Some(v4) = os_2.v4() { // v4 is &Os_2V4
+//!     println!("Last char idx: {}", v4.us_last_char_index); // a field in Os_2Base
+//!     println!("Default char: {}", v4.us_default_char); // a field in Os_2V4
+//! }
+//! ```
+//!
+//! Note about types: if a type is suffixed with `Raw`, then it means it doesn't provide much info
+//! on its own, and you should generally use a higher-level type without this suffix. For example,
+//! [`TableRecordRaw`][tables::TableRecordRaw] only specifies an offset from the font's root, so it
+//! can't provide the actual table's data. But [`TableRecord`](tables::TableRecord) is a
+//! higher-level wrapper which does have a reference to the font, and can provide its table's data.
+//!
+//! ```ignore
+//! let record_raw: &TableRecordRaw = dir.table_record_raw(tags::head).unwrap();
+//! // can access fields just fine
+//! println!("'head' length: {}", record_raw.length);
+//! println!("'head' offset: {}", record_raw.offset);
+//! // but can't access the actual table
+//!
+//! let record: TableRecord<'_> = dir.table_record(tags::head).unwrap();
+//! // auto-derefs to &TableRecordRaw for field access
+//! println!("'head' length: {}", record_raw.length);
+//! println!("'head' offset: {}", record_raw.offset);
+//! // and can also access the actual table
+//! let bytes = record.table_as_bytes();
+//! let head = record.table_as::<Head<'_>>().unwrap();
+//! ```
+//!
 //! [`TableDirectory`]: tables::TableDirectory
 //! [`ttf-parser`]: https://docs.rs/ttf-parser/latest/ttf_parser/
 //! [`read-fonts`]: https://docs.rs/read-fonts/latest/read_fonts/

@@ -80,7 +80,7 @@ const impl<'a> std::ops::Deref for EncodingRecord<'a> {
     }
 }
 impl<'a> EncodingRecord<'a> {
-    pub const fn subtable(&self) -> &'a CmapSubtableRaw {
+    pub const fn subtable(&self) -> &'a CmapSubtable {
         let offset = self.1.subtable_offset.get() as _;
         unsafe { &*std::ptr::from_ref(self.0).cast::<u8>().byte_add(offset).cast() }
     }
@@ -106,7 +106,7 @@ iterator_map!(EncodingsIter<'a> {
 });
 
 #[repr(C)]
-pub struct CmapSubtableRaw {
+pub struct CmapSubtable {
     meta: SubtableMeta,
     // : <format-specific data: use meta.*.data to point to>,
 }
@@ -158,7 +158,7 @@ struct LenOnlyMeta {
     data: [u8; 0],
 }
 
-impl CmapSubtableRaw {
+impl CmapSubtable {
     pub const fn format(&self) -> u16 {
         unsafe { self.meta.short.format.get() }
     }
@@ -211,31 +211,31 @@ impl CmapSubtableRaw {
         unsafe { &*std::ptr::from_ref(self.data_ptr().unwrap()).cast() }
     }
 
-    pub const fn as_format0(&self) -> Option<&format0::CmapSubtableFormat0Repr> {
+    pub const fn as_format0(&self) -> Option<&format0::Format0> {
         self.get_as()
     }
-    pub const fn as_format2(&self) -> Option<&format2::CmapSubtableFormat2Repr> {
+    pub const fn as_format2(&self) -> Option<&format2::Format2> {
         self.get_as()
     }
-    pub const fn as_format4(&self) -> Option<&format4::CmapSubtableFormat4Repr> {
+    pub const fn as_format4(&self) -> Option<&format4::Format4> {
         self.get_as()
     }
-    pub const fn as_format6(&self) -> Option<&format6::CmapSubtableFormat6Repr> {
+    pub const fn as_format6(&self) -> Option<&format6::Format6> {
         self.get_as()
     }
-    pub const fn as_format8(&self) -> Option<&format8::CmapSubtableFormat8Repr> {
+    pub const fn as_format8(&self) -> Option<&format8::Format8> {
         self.get_as()
     }
-    pub const fn as_format10(&self) -> Option<&format10::CmapSubtableFormat10Repr> {
+    pub const fn as_format10(&self) -> Option<&format10::Format10> {
         self.get_as()
     }
-    pub const fn as_format12(&self) -> Option<&format12::CmapSubtableFormat12Repr> {
+    pub const fn as_format12(&self) -> Option<&format12::Format12> {
         self.get_as()
     }
-    pub const fn as_format13(&self) -> Option<&format13::CmapSubtableFormat13Repr> {
+    pub const fn as_format13(&self) -> Option<&format13::Format13> {
         self.get_as()
     }
-    pub const fn as_format14(&self) -> Option<&format14::CmapSubtableFormat14Repr> {
+    pub const fn as_format14(&self) -> Option<&format14::Format14> {
         self.get_as()
     }
 }

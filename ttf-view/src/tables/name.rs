@@ -11,7 +11,7 @@ pub struct NameV0 {
     pub version: uint16,
     pub count: uint16,
     pub storage_offset: Offset16,
-    name_records: [NameRecord; 0],
+    name_records: [NameRecordRaw; 0],
 }
 #[repr(C)]
 pub struct NameV1 {
@@ -29,7 +29,7 @@ const impl std::ops::Deref for NameV1 {
 }
 
 #[repr(C)]
-pub struct NameRecord {
+pub struct NameRecordRaw {
     pub platform_id: uint16,
     pub encoding_id: uint16,
     pub language_id: uint16,
@@ -38,7 +38,7 @@ pub struct NameRecord {
     pub string_offset: Offset16,
 }
 #[repr(C)]
-pub struct LangTagRecord {
+pub struct LangTagRecordRaw {
     pub length: uint16,
     pub lang_tag_offset: Offset16,
 }
@@ -79,24 +79,24 @@ impl<'a> Name<'a> {
         }
     }
 
-    pub const fn names(&self) -> NamesIter<'a> {
-        NamesIter::new(*self)
+    pub const fn names(&self) -> NameRecordsIter<'a> {
+        NameRecordsIter::new(*self)
     }
-    pub const fn lang_tags(&self) -> LangTagsIter<'a> {
-        LangTagsIter::new(*self)
+    pub const fn lang_tags(&self) -> LangTagRecordsIter<'a> {
+        LangTagRecordsIter::new(*self)
     }
 
     // version ≥ 1:
     pub const fn lang_tag_count(&self) -> Option<uint16> {
         Some(self.v1()?.lang_tag_count())
     }
-    pub const fn lang_tag_records(&self) -> Option<&'a [LangTagRecord]> {
+    pub const fn lang_tag_records(&self) -> Option<&'a [LangTagRecordRaw]> {
         Some(self.v1()?.lang_tag_records())
     }
 }
 
 impl NameV0 {
-    pub const fn name_records(&self) -> &[NameRecord] {
+    pub const fn name_records(&self) -> &[NameRecordRaw] {
         unsafe { std::slice::from_raw_parts(self.name_records.as_ptr(), self.count.get() as _) }
     }
     pub const fn string_storage(&self) -> &StringStorage {
@@ -109,7 +109,7 @@ impl NameV1 {
     pub const fn lang_tag_count(&self) -> uint16 {
         unsafe { *self.name_records().as_ptr_range().end.cast::<uint16>() }
     }
-    pub const fn lang_tag_records(&self) -> &[LangTagRecord] {
+    pub const fn lang_tag_records(&self) -> &[LangTagRecordRaw] {
         let len_ptr = self.name_records().as_ptr_range().end.cast::<uint16>();
         unsafe { std::slice::from_raw_parts(len_ptr.add(1).cast(), (*len_ptr).get() as _) }
     }
@@ -130,26 +130,26 @@ impl StringStorage {
 
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct NameString<'a>(Name<'a>, &'a NameRecord);
+pub struct NameRecord<'a>(Name<'a>, &'a NameRecordRaw);
 
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct LangTag<'a>(Name<'a>, &'a LangTagRecord);
+pub struct LangTagRecord<'a>(Name<'a>, &'a LangTagRecordRaw);
 
-const impl<'a> std::ops::Deref for NameString<'a> {
-    type Target = &'a NameRecord;
+const impl<'a> std::ops::Deref for NameRecord<'a> {
+    type Target = &'a NameRecordRaw;
     fn deref(&self) -> &Self::Target {
         &self.1
     }
 }
-const impl<'a> std::ops::Deref for LangTag<'a> {
-    type Target = &'a LangTagRecord;
+const impl<'a> std::ops::Deref for LangTagRecord<'a> {
+    type Target = &'a LangTagRecordRaw;
     fn deref(&self) -> &Self::Target {
         &self.1
     }
 }
 
-impl<'a> NameString<'a> {
+impl<'a> NameRecord<'a> {
     pub const fn bytes(&self) -> &'a [u8] {
         unsafe { self.0.string_storage().get(self.1.string_offset.get(), self.1.length.get()) }
     }
@@ -159,7 +159,7 @@ impl<'a> NameString<'a> {
     }
 }
 
-impl<'a> LangTag<'a> {
+impl<'a> LangTagRecord<'a> {
     pub const fn bytes(&self) -> &'a [u8] {
         unsafe { self.0.string_storage().get(self.1.lang_tag_offset.get(), self.1.length.get()) }
     }
@@ -171,42 +171,42 @@ impl<'a> LangTag<'a> {
 
 // TODO: When std::slice::Iter's Clone is constified, make the derive const
 #[derive(Clone)]
-pub struct NamesIter<'a> {
+pub struct NameRecordsIter<'a> {
     table: Name<'a>,
-    inner: std::slice::Iter<'a, NameRecord>,
+    inner: std::slice::Iter<'a, NameRecordRaw>,
 }
-impl<'a> NamesIter<'a> {
+impl<'a> NameRecordsIter<'a> {
     pub const fn new(table: Name<'a>) -> Self {
         Self { table, inner: table.name_records().iter() }
     }
     // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
-    pub fn as_records(&self) -> &'a [NameRecord] {
+    pub fn as_records(&self) -> &'a [NameRecordRaw] {
         self.inner.as_slice()
     }
 }
-iterator_map!(NamesIter<'a> {
-    type Item = NameString<'a>;
-    |this, x| NameString(this.table, x)
+iterator_map!(NameRecordsIter<'a> {
+    type Item = NameRecord<'a>;
+    |this, x| NameRecord(this.table, x)
 });
 
 // TODO: When std::slice::Iter's Clone is constified, make the derive const
 #[derive(Clone)]
-pub struct LangTagsIter<'a> {
+pub struct LangTagRecordsIter<'a> {
     table: Name<'a>,
-    inner: std::slice::Iter<'a, LangTagRecord>,
+    inner: std::slice::Iter<'a, LangTagRecordRaw>,
 }
-impl<'a> LangTagsIter<'a> {
+impl<'a> LangTagRecordsIter<'a> {
     pub const fn new(table: Name<'a>) -> Self {
         Self { table, inner: table.lang_tag_records().unwrap_or(&[]).iter() }
     }
     // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
-    pub fn as_records(&self) -> &'a [LangTagRecord] {
+    pub fn as_records(&self) -> &'a [LangTagRecordRaw] {
         self.inner.as_slice()
     }
 }
-iterator_map!(LangTagsIter<'a> {
-    type Item = LangTag<'a>;
-    |this, x| LangTag(this.table, x)
+iterator_map!(LangTagRecordsIter<'a> {
+    type Item = LangTagRecord<'a>;
+    |this, x| LangTagRecord(this.table, x)
 });
 
 impl std::fmt::Debug for Name<'_> {
@@ -239,7 +239,7 @@ impl std::fmt::Debug for NameV1 {
     }
 }
 
-impl std::fmt::Debug for NameString<'_> {
+impl std::fmt::Debug for NameRecord<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let Self(name, rec) = *self;
 
@@ -274,7 +274,7 @@ impl std::fmt::Debug for NameString<'_> {
     }
 }
 
-impl std::fmt::Debug for LangTag<'_> {
+impl std::fmt::Debug for LangTagRecord<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let Self(_, rec) = *self;
 

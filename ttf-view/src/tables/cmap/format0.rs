@@ -1,15 +1,15 @@
 use crate::tables::cmap::GlyphId;
 
 #[repr(C)]
-pub struct CmapSubtableFormat0Repr {
+pub struct Format0 {
     pub glyph_id_array: [u8; 256],
 }
 
-impl super::CmapSubtableTrait for CmapSubtableFormat0Repr {
+impl super::CmapSubtableTrait for Format0 {
     const FORMAT: u16 = 0;
 }
 
-impl CmapSubtableFormat0Repr {
+impl Format0 {
     pub const fn map(&self, codepoint: u8) -> GlyphId {
         self.glyph_id_array[codepoint as usize].into()
     }

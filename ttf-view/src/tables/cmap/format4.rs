@@ -2,7 +2,7 @@ use crate::types::uint16;
 
 #[repr(C)]
 #[non_exhaustive]
-pub struct CmapSubtableFormat4Repr {
+pub struct Format4 {
     seg_count_x2: uint16,
     pub search_range: uint16,
     pub entry_selector: uint16,
@@ -16,7 +16,7 @@ pub struct CmapSubtableFormat4Repr {
     // : glyph_id_array: [uint16; arbitrary length],
 }
 
-impl super::CmapSubtableTrait for CmapSubtableFormat4Repr {
+impl super::CmapSubtableTrait for Format4 {
     const FORMAT: u16 = 4;
 }
 

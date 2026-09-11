@@ -1,13 +1,13 @@
-use crate::{tables::cmap::format8::SequentialMapGroupRepr, types::uint32};
+use crate::{tables::cmap::format8::SequentialMapGroup, types::uint32};
 
 #[repr(C)]
 #[non_exhaustive]
-pub struct CmapSubtableFormat12Repr {
+pub struct Format12 {
     pub num_groups: uint32,
-    groups: [SequentialMapGroupRepr; 0],
+    groups: [SequentialMapGroup; 0],
 }
 
-impl super::CmapSubtableTrait for CmapSubtableFormat12Repr {
+impl super::CmapSubtableTrait for Format12 {
     const FORMAT: u16 = 12;
 }
 
