@@ -2,12 +2,14 @@ use crate::types::{FWORD, Tag, UFWORD, int16, tags, uint16};
 
 #[repr(C)]
 pub struct HheaV0 {
+    _exhaustive_but_dont_instantiate: (),
+    // version any:
     pub major_version: uint16,
     pub minor_version: uint16,
 }
 #[repr(C)]
 pub struct HheaV1 {
-    base: HheaV0,
+    v1: HheaV0,
     // version = 1.x:
     pub ascender: FWORD,
     pub descender: FWORD,
@@ -30,7 +32,7 @@ pub struct HheaV1 {
 const impl std::ops::Deref for HheaV1 {
     type Target = HheaV0;
     fn deref(&self) -> &Self::Target {
-        &self.base
+        &self.v1
     }
 }
 
@@ -39,7 +41,7 @@ impl super::RawTable for HheaV0 {
 }
 impl<'a> super::Table<'a> for Hhea<'a> {
     const TAG: Tag = tags::hhea;
-    fn in_directory(dir: &'a super::TableDirectoryRepr) -> Option<Self> {
+    fn in_directory(dir: &'a super::TableDirectory) -> Option<Self> {
         Some(Self { hhea: dir.table_raw()? })
     }
 }
@@ -50,10 +52,10 @@ pub struct Hhea<'a> {
     hhea: &'a HheaV0,
 }
 
-const impl std::ops::Deref for Hhea<'_> {
-    type Target = HheaV0;
+const impl<'a> std::ops::Deref for Hhea<'a> {
+    type Target = &'a HheaV0;
     fn deref(&self) -> &Self::Target {
-        self.hhea
+        &self.hhea
     }
 }
 

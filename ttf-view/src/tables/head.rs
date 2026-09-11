@@ -2,12 +2,14 @@ use crate::types::{Fixed, LongDateTime, Tag, int16, tags, uint16, uint32};
 
 #[repr(C)]
 pub struct HeadV0 {
+    _exhaustive_but_dont_instantiate: (),
+    // version any:
     pub major_version: uint16,
     pub minor_version: uint16,
 }
 #[repr(C)]
 pub struct HeadV1 {
-    base: HeadV0,
+    v0: HeadV0,
     // version = 1.x:
     pub font_revision: Fixed,
     pub checksum_adjustment: uint32,
@@ -30,7 +32,7 @@ pub struct HeadV1 {
 const impl std::ops::Deref for HeadV1 {
     type Target = HeadV0;
     fn deref(&self) -> &Self::Target {
-        &self.base
+        &self.v0
     }
 }
 
@@ -39,7 +41,7 @@ impl super::RawTable for HeadV0 {
 }
 impl<'a> super::Table<'a> for Head<'a> {
     const TAG: Tag = tags::head;
-    fn in_directory(dir: &'a super::TableDirectoryRepr) -> Option<Self> {
+    fn in_directory(dir: &'a super::TableDirectory) -> Option<Self> {
         Some(Self { head: dir.table_raw()? })
     }
 }
@@ -50,10 +52,10 @@ pub struct Head<'a> {
     head: &'a HeadV0,
 }
 
-const impl std::ops::Deref for Head<'_> {
-    type Target = HeadV0;
+const impl<'a> std::ops::Deref for Head<'a> {
+    type Target = &'a HeadV0;
     fn deref(&self) -> &Self::Target {
-        self.head
+        &self.head
     }
 }
 

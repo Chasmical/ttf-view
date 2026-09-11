@@ -25,21 +25,21 @@
 //! But, as long as the font file is well-formed, there shouldn't be any issues.
 //!
 //! ```no_run
-//! use ttf_view::tables::TableDirectoryRepr;
+//! use ttf_view::tables::TableDirectory;
 //!
 //! let data = std::fs::read("MyFont.ttf").unwrap();
-//! let dir = unsafe { TableDirectoryRepr::new_unchecked(&data) };
+//! let dir = unsafe { TableDirectory::new_unchecked(&data) };
 //!
 //! if let Some(cmap) = dir.cmap() {
 //!     // ...
 //! }
 //! ```
 //!
-//! [`TableDirectoryRepr`] is the entry point and the main hub for OpenType tables.
+//! [`TableDirectory`] is the entry point and the main hub for OpenType tables.
 //!
 //! See the [`tables`] module for more information about tables that you can access.
 //!
-//! [`TableDirectoryRepr`]: tables::TableDirectoryRepr
+//! [`TableDirectory`]: tables::TableDirectory
 //! [`ttf-parser`]: https://docs.rs/ttf-parser/latest/ttf_parser/
 //! [`read-fonts`]: https://docs.rs/read-fonts/latest/read_fonts/
 
@@ -62,6 +62,7 @@
 #![feature(formatting_options)]
 #![feature(slice_from_ptr_range)]
 #![feature(try_trait_v2)]
+#![allow(clippy::manual_non_exhaustive)]
 #![allow(clippy::missing_safety_doc)] // TODO: remove when adding docs
 
 pub mod platform;

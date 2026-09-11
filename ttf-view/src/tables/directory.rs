@@ -5,24 +5,24 @@ use crate::{
 };
 
 #[repr(C)]
-#[non_exhaustive]
-pub struct TableDirectoryRepr {
+pub struct TableDirectory {
     pub sfnt_version: uint32,
     pub num_tables: uint16,
     pub search_range: uint16,
     pub entry_selector: uint16,
     pub range_shift: uint16,
-    table_records: [TableRecordRepr; 0],
+    table_records: [TableRecord; 0],
 }
 #[repr(C)]
-pub struct TableRecordRepr {
+pub struct TableRecord {
+    _exhaustive_but_dont_instantiate: (),
     pub table_tag: Tag,
     pub checksum: uint32,
     pub offset: Offset32,
     pub length: uint32,
 }
 
-impl TableDirectoryRepr {
+impl TableDirectory {
     pub const unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
         unsafe { &*bytes.as_ptr().cast() }
     }
@@ -33,19 +33,19 @@ impl TableDirectoryRepr {
         unsafe { std::slice::from_ptr_range(start..end) }
     }
 
-    pub const fn table_records_raw(&self) -> &[TableRecordRepr] {
+    pub const fn table_records_raw(&self) -> &[TableRecord] {
         let len = self.num_tables.get() as usize;
         unsafe { std::slice::from_raw_parts(self.table_records.as_ptr(), len) }
     }
-    pub fn table_record_raw(&self, tag: Tag) -> Option<&TableRecordRepr> {
+    pub fn table_record_raw(&self, tag: Tag) -> Option<&TableRecord> {
         self.table_records_raw().iter().find(|x| x.table_tag == tag)
     }
 
     pub const fn table_records(&self) -> TableRecordsIter<'_> {
         TableRecordsIter::new(self)
     }
-    pub fn table_record(&self, tag: Tag) -> Option<TableRecord<'_>> {
-        Some(TableRecord(self, self.table_record_raw(tag)?))
+    pub fn table_record(&self, tag: Tag) -> Option<TableHandle<'_>> {
+        Some(TableHandle(self, self.table_record_raw(tag)?))
     }
 
     pub fn table_raw<T: RawTable>(&self) -> Option<&T> {
@@ -60,16 +60,16 @@ impl TableDirectoryRepr {
 
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct TableRecord<'a>(&'a TableDirectoryRepr, &'a TableRecordRepr);
+pub struct TableHandle<'a>(&'a TableDirectory, &'a TableRecord);
 
-const impl std::ops::Deref for TableRecord<'_> {
-    type Target = TableRecordRepr;
+const impl<'a> std::ops::Deref for TableHandle<'a> {
+    type Target = &'a TableRecord;
     fn deref(&self) -> &Self::Target {
-        self.1
+        &self.1
     }
 }
 
-impl<'a> TableRecord<'a> {
+impl<'a> TableHandle<'a> {
     pub const fn table_as_bytes(&self) -> &'a [u8] {
         unsafe {
             let start = std::ptr::from_ref(self.0).cast::<u8>().add(self.offset.get() as _);
@@ -110,24 +110,24 @@ impl<'a> TableRecord<'a> {
 // TODO: When std::slice::Iter's Clone is constified, make the derive const
 #[derive(Clone)]
 pub struct TableRecordsIter<'a> {
-    dir: &'a TableDirectoryRepr,
-    inner: std::slice::Iter<'a, TableRecordRepr>,
+    dir: &'a TableDirectory,
+    inner: std::slice::Iter<'a, TableRecord>,
 }
 impl<'a> TableRecordsIter<'a> {
-    pub const fn new(dir: &'a TableDirectoryRepr) -> Self {
+    pub const fn new(dir: &'a TableDirectory) -> Self {
         Self { dir, inner: dir.table_records_raw().iter() }
     }
     // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
-    pub fn as_records(&self) -> &'a [TableRecordRepr] {
+    pub fn as_records(&self) -> &'a [TableRecord] {
         self.inner.as_slice()
     }
 }
 iterator_map!(TableRecordsIter<'a> {
-    type Item = TableRecord<'a>;
-    |this, x| TableRecord(this.dir, x)
+    type Item = TableHandle<'a>;
+    |this, x| TableHandle(this.dir, x)
 });
 
-impl std::fmt::Debug for TableDirectoryRepr {
+impl std::fmt::Debug for TableDirectory {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("TableDirectory")
             .field_with("sfnt_version", |f| write!(f, "{:#010X}", self.sfnt_version))
@@ -148,7 +148,7 @@ impl std::fmt::Debug for TableDirectoryRepr {
             .finish()
     }
 }
-impl std::fmt::Debug for TableRecordRepr {
+impl std::fmt::Debug for TableRecord {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("TableRecord")
             .field("table_tag", &self.table_tag)
@@ -158,8 +158,8 @@ impl std::fmt::Debug for TableRecordRepr {
             .finish()
     }
 }
-impl std::fmt::Debug for TableRecord<'_> {
+impl std::fmt::Debug for TableHandle<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        TableRecordRepr::fmt(self, f)
+        TableRecord::fmt(self, f)
     }
 }

@@ -2,18 +2,20 @@ use crate::types::{Tag, Version16Dot16, tags, uint16};
 
 #[repr(C)]
 pub struct MaxpV0 {
+    _exhaustive_but_dont_instantiate: (),
+    // version any:
     pub version: Version16Dot16,
 }
 #[repr(C)]
 pub struct MaxpV05 {
-    base: MaxpV0,
+    v0: MaxpV0,
     // version ≥ 0.5:
     pub num_glyphs: uint16,
 }
 #[repr(C)]
 pub struct MaxpV1 {
     v05: MaxpV05,
-    // version ≥ 1.0:
+    // version = 1.x:
     pub max_points: uint16,
     pub max_contours: uint16,
     pub max_composite_points: uint16,
@@ -32,7 +34,7 @@ pub struct MaxpV1 {
 const impl std::ops::Deref for MaxpV05 {
     type Target = MaxpV0;
     fn deref(&self) -> &Self::Target {
-        &self.base
+        &self.v0
     }
 }
 const impl std::ops::Deref for MaxpV1 {
@@ -47,7 +49,7 @@ impl super::RawTable for MaxpV0 {
 }
 impl<'a> super::Table<'a> for Maxp<'a> {
     const TAG: Tag = tags::maxp;
-    fn in_directory(dir: &'a super::TableDirectoryRepr) -> Option<Self> {
+    fn in_directory(dir: &'a super::TableDirectory) -> Option<Self> {
         Some(Self { maxp: dir.table_raw()? })
     }
 }
@@ -58,10 +60,10 @@ pub struct Maxp<'a> {
     maxp: &'a MaxpV0,
 }
 
-const impl std::ops::Deref for Maxp<'_> {
-    type Target = MaxpV0;
+const impl<'a> std::ops::Deref for Maxp<'a> {
+    type Target = &'a MaxpV0;
     fn deref(&self) -> &Self::Target {
-        self.maxp
+        &self.maxp
     }
 }
 

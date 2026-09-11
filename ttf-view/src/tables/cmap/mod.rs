@@ -22,14 +22,15 @@ pub mod format13;
 pub mod format14;
 
 #[repr(C)]
-#[non_exhaustive]
 pub struct CmapV0 {
+    _exhaustive_but_dont_instantiate: (),
+    // version ≥ 0:
     pub version: uint16,
     pub num_tables: uint16,
-    encoding_records: [EncodingRecordRepr; 0],
+    encoding_records: [EncodingRecordRaw; 0],
 }
 #[repr(C)]
-pub struct EncodingRecordRepr {
+pub struct EncodingRecordRaw {
     pub platform_id: uint16,
     pub encoding_id: uint16,
     pub subtable_offset: Offset32,
@@ -40,7 +41,7 @@ impl super::RawTable for CmapV0 {
 }
 impl<'a> super::Table<'a> for Cmap<'a> {
     const TAG: Tag = tags::cmap;
-    fn in_directory(dir: &'a super::TableDirectoryRepr) -> Option<Self> {
+    fn in_directory(dir: &'a super::TableDirectory) -> Option<Self> {
         Some(Self { cmap: dir.table_raw()? })
     }
 }
@@ -51,15 +52,15 @@ pub struct Cmap<'a> {
     cmap: &'a CmapV0,
 }
 
-const impl std::ops::Deref for Cmap<'_> {
-    type Target = CmapV0;
+const impl<'a> std::ops::Deref for Cmap<'a> {
+    type Target = &'a CmapV0;
     fn deref(&self) -> &Self::Target {
-        self.cmap
+        &self.cmap
     }
 }
 
 impl CmapV0 {
-    pub const fn encoding_records(&self) -> &[EncodingRecordRepr] {
+    pub const fn encoding_records(&self) -> &[EncodingRecordRaw] {
         let len = self.num_tables.get() as usize;
         unsafe { std::slice::from_raw_parts(self.encoding_records.as_ptr(), len) }
     }
@@ -70,16 +71,16 @@ impl CmapV0 {
 
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct EncodingRecord<'a>(&'a CmapV0, &'a EncodingRecordRepr);
+pub struct EncodingRecord<'a>(&'a CmapV0, &'a EncodingRecordRaw);
 
-const impl std::ops::Deref for EncodingRecord<'_> {
-    type Target = EncodingRecordRepr;
+const impl<'a> std::ops::Deref for EncodingRecord<'a> {
+    type Target = &'a EncodingRecordRaw;
     fn deref(&self) -> &Self::Target {
-        self.1
+        &self.1
     }
 }
 impl<'a> EncodingRecord<'a> {
-    pub const fn subtable(&self) -> &'a CmapSubtableRepr {
+    pub const fn subtable(&self) -> &'a CmapSubtableRaw {
         let offset = self.1.subtable_offset.get() as _;
         unsafe { &*std::ptr::from_ref(self.0).cast::<u8>().byte_add(offset).cast() }
     }
@@ -88,14 +89,14 @@ impl<'a> EncodingRecord<'a> {
 // TODO: When std::slice::Iter's Clone is constified, make the derive const
 pub struct EncodingsIter<'a> {
     cmap: &'a CmapV0,
-    inner: std::slice::Iter<'a, EncodingRecordRepr>,
+    inner: std::slice::Iter<'a, EncodingRecordRaw>,
 }
 impl<'a> EncodingsIter<'a> {
     pub const fn new(cmap: &'a CmapV0) -> Self {
         Self { cmap, inner: cmap.encoding_records().iter() }
     }
     // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
-    pub fn as_records(&self) -> &'a [EncodingRecordRepr] {
+    pub fn as_records(&self) -> &'a [EncodingRecordRaw] {
         self.inner.as_slice()
     }
 }
@@ -105,8 +106,7 @@ iterator_map!(EncodingsIter<'a> {
 });
 
 #[repr(C)]
-#[non_exhaustive]
-pub struct CmapSubtableRepr {
+pub struct CmapSubtableRaw {
     meta: SubtableMeta,
     // : <format-specific data: use meta.*.data to point to>,
 }
@@ -137,7 +137,6 @@ union SubtableMeta {
 }
 
 #[repr(C)]
-#[non_exhaustive]
 struct ShortMeta {
     format: uint16,
     length: uint16,
@@ -145,7 +144,6 @@ struct ShortMeta {
     data: [u8; 0],
 }
 #[repr(C)]
-#[non_exhaustive]
 struct LongMeta {
     format: uint16,
     reserved: uint16,
@@ -154,14 +152,13 @@ struct LongMeta {
     data: [u8; 0],
 }
 #[repr(C)]
-#[non_exhaustive]
 struct LenOnlyMeta {
     format: uint16,
     length: uint32,
     data: [u8; 0],
 }
 
-impl CmapSubtableRepr {
+impl CmapSubtableRaw {
     pub const fn format(&self) -> u16 {
         unsafe { self.meta.short.format.get() }
     }

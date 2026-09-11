@@ -16,10 +16,10 @@ pub trait RawTable {
 }
 pub trait Table<'a>: Sized {
     const TAG: Tag;
-    fn in_directory(dir: &'a TableDirectoryRepr) -> Option<Self>;
+    fn in_directory(dir: &'a TableDirectory) -> Option<Self>;
 }
 
-impl TableDirectoryRepr {
+impl TableDirectory {
     // Note: Even though these tables are required, we'll still use Option here
     pub fn cmap(&self) -> Option<cmap::Cmap<'_>> {
         self.table()

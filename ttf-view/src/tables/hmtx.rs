@@ -1,5 +1,5 @@
 use crate::{
-    tables::{TableDirectoryRepr, cmap::GlyphId},
+    tables::{TableDirectory, cmap::GlyphId},
     types::{FWORD, Tag, UFWORD, tags},
 };
 
@@ -10,12 +10,12 @@ struct HmtxRaw {
     /// Note: It's a little bit faster to work with `&[FWORD]` than with separately typed slices.
     /// See [`Hmtx::metric`] method for explanation.
     raw_words: [FWORD; 0],
-    // : h_metrics: [LongHorMetricRepr; hhea().num_h_metrics],
+    // : h_metrics: [LongHorMetricRaw; hhea().num_h_metrics],
     // : left_side_bearings: [FWORD; maxp().num_glyphs - hhea().num_h_metrics],
 }
 
 #[repr(C)]
-pub struct LongHorMetricRepr {
+pub struct LongHorMetricRaw {
     pub advance_width: UFWORD,
     pub lsb: FWORD,
 }
@@ -25,7 +25,7 @@ impl super::RawTable for HmtxRaw {
 }
 impl<'a> super::Table<'a> for Hmtx<'a> {
     const TAG: Tag = tags::hmtx;
-    fn in_directory(dir: &'a TableDirectoryRepr) -> Option<Self> {
+    fn in_directory(dir: &'a TableDirectory) -> Option<Self> {
         let raw_words = dir.table_raw::<HmtxRaw>()?.raw_words.as_ptr();
         let num_h_metrics = dir.hhea()?.v1()?.number_of_h_metrics.get() as usize;
         let num_glyphs = dir.maxp()?.v05()?.num_glyphs.get() as usize;
@@ -56,8 +56,8 @@ impl LongHorMetric {
         Self { aw, lsb }
     }
 }
-const impl From<&LongHorMetricRepr> for LongHorMetric {
-    fn from(value: &LongHorMetricRepr) -> Self {
+const impl From<&LongHorMetricRaw> for LongHorMetric {
+    fn from(value: &LongHorMetricRaw) -> Self {
         Self { aw: value.advance_width.get(), lsb: value.lsb.get() }
     }
 }
@@ -70,7 +70,7 @@ impl<'a> Hmtx<'a> {
         (self.raw_words.len() - self.num_h_metrics) as u16
     }
 
-    const fn h_metrics(&self) -> &'a [LongHorMetricRepr] {
+    const fn h_metrics(&self) -> &'a [LongHorMetricRaw] {
         unsafe { std::slice::from_raw_parts(self.raw_words.as_ptr().cast(), self.num_h_metrics) }
     }
 

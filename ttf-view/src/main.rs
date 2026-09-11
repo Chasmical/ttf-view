@@ -113,7 +113,7 @@ fn main() {
             Err(err) => error_exit!("{} '{}'", err, &path),
         });
         font_data.as_ref().map(|data| {
-            return unsafe { TableDirectoryRepr::new_unchecked(&data) };
+            return unsafe { TableDirectory::new_unchecked(&data) };
         })
     };
 
@@ -134,7 +134,7 @@ const DIR_TAG: Tag = if let Ok(tag) = Tag::from_str("dir") { tag } else { unreac
 // This macro constructs the dump() fn, and the supported formats table.
 macro_rules! implement_tables {
     ($dir:ident { $( $tag:path, $name:expr $(, $get_table:expr => $Table:ty)? );* $(;)? }) => {
-        fn dump($dir: &TableDirectoryRepr, tag: Option<Tag>, format: Format) {
+        fn dump($dir: &TableDirectory, tag: Option<Tag>, format: Format) {
             // Binary format should always work for any tables
             if format == Format::Binary {
                 let bytes = match tag {
@@ -288,7 +288,7 @@ The project's GitHub repository: https://github.com/Chasmical/ttf-view
     );
 }
 
-fn print_tables(dir: Option<&TableDirectoryRepr>) {
+fn print_tables(dir: Option<&TableDirectory>) {
     if dir.is_some() {
         println!("The specified font contains the following tables:");
     } else {

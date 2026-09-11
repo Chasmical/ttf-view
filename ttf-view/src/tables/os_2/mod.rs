@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
 use crate::{
-    tables::TableDirectoryRepr,
+    tables::TableDirectory,
     types::{FWORD, Tag, UFWORD, int16, tags, uint16, uint32},
 };
 
@@ -108,7 +108,7 @@ impl super::RawTable for Os_2Base {
 }
 impl<'a> super::Table<'a> for Os_2<'a> {
     const TAG: Tag = tags::OS_2;
-    fn in_directory(dir: &'a TableDirectoryRepr) -> Option<Self> {
+    fn in_directory(dir: &'a TableDirectory) -> Option<Self> {
         let record = dir.table_record(tags::OS_2)?;
         Some(Self { base: record.table_as()?, len: record.length.get() })
     }
@@ -121,10 +121,10 @@ pub struct Os_2<'a> {
     len: u32,
 }
 
-const impl std::ops::Deref for Os_2<'_> {
-    type Target = Os_2Base;
+const impl<'a> std::ops::Deref for Os_2<'a> {
+    type Target = &'a Os_2Base;
     fn deref(&self) -> &Self::Target {
-        self.base
+        &self.base
     }
 }
 
