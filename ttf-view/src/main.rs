@@ -238,7 +238,7 @@ implement_tables!(dir {
     tags::HVAR, "Horizontal Metrics Variations Table"; // dir.hvar() => hvar::Hvar;
     tags::JSTF, "Justification Table"; // dir.jstf() => jstf::Jstf;
     tags::kern, "Kerning Table"; // dir.kern() => kern::Kern;
-    tags::loca, "Index to Location Table"; // dir.loca() => loca::Loca;
+    tags::loca, "Index to Location Table", dir.loca() => loca::Loca;
     tags::LTSH, "Linear Threshold Table"; // dir.ltsh() => ltsh::Ltsh;
     tags::MATH, "Mathematical Typesetting Table"; // dir.math() => math::Math;
     tags::maxp, "Maximum Profile", dir.maxp() => maxp::Maxp;

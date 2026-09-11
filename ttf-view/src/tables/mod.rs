@@ -7,6 +7,7 @@ pub mod cmap;
 pub mod head;
 pub mod hhea;
 pub mod hmtx;
+pub mod loca;
 pub mod maxp;
 pub mod name;
 pub mod os_2;
@@ -23,6 +24,9 @@ impl TableDirectory {
         self.table()
     }
     pub fn hmtx(&self) -> Result<hmtx::Hmtx<'_>, TableError> {
+        self.table()
+    }
+    pub fn loca(&self) -> Result<loca::Loca<'_>, TableError> {
         self.table()
     }
     pub fn maxp(&self) -> Result<maxp::Maxp<'_>, TableError> {
@@ -48,6 +52,8 @@ pub enum TableError {
     NotFound,
     #[error("unknown version")]
     UnknownVersion,
+    #[error("unknown format")]
+    UnknownFormat,
     #[error("dependency '{0}'")]
     Dependency(Tag),
     #[error("dependency: {0}")]
