@@ -1,7 +1,7 @@
 use crate::{
     tables::{Table, TableDirectory, TableError},
     types::{Offset32, Tag, tags, uint16, uint32},
-    util::iterator_map,
+    util::custom_iterator,
 };
 use std::mem::ManuallyDrop;
 
@@ -132,9 +132,9 @@ impl<'a> EncodingsIter<'a> {
         self.inner.as_slice()
     }
 }
-iterator_map!(EncodingsIter<'a> {
+custom_iterator!(EncodingsIter<'a> as this {
     type Item = EncodingRecord<'a>;
-    |this, x| EncodingRecord(this.cmap, x)
+    map: |x| EncodingRecord(this.cmap, x);
 });
 
 #[repr(C)]

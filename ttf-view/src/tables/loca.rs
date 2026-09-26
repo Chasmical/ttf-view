@@ -1,14 +1,9 @@
 use crate::{
     tables::{Table, TableDirectory, TableError, cmap::GlyphId},
     types::{Offset16, Offset32, Tag, tags},
+    util::{PackedDualIter, custom_iterator},
 };
-use std::{fmt::Debug, ops::Range};
-
-#[repr(C)]
-struct LocaRaw {
-    short_offsets: [Offset16; 0],
-    long_offsets: [Offset32; 0],
-}
+use std::{num::NonZero, ops::Range, ptr::NonNull};
 
 #[derive(Debug, Copy, Hash)]
 #[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -19,7 +14,27 @@ pub enum LocaFormat {
     Long = 1,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+impl LocaFormat {
+    // Note: this fn is not public because LocaFormat is not exhaustive.
+    const fn stride(&self) -> u8 {
+        match self {
+            Self::Short => 2,
+            Self::Long => 4,
+        }
+    }
+}
+const impl TryFrom<i16> for LocaFormat {
+    type Error = ();
+    fn try_from(value: i16) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => Self::Short,
+            1 => Self::Long,
+            _ => return Err(()),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LocaOffsets<'a> {
     Short(&'a [Offset16]),
@@ -35,8 +50,10 @@ impl<'a> Table<'a> for Loca<'a> {
             .head()
             .map_err(|_| TableError::Dependency(tags::head))?
             .index_to_loc_format()
-            .ok_or(TableError::DependencyError(&"index_to_loc_format not found"))?
-            .get();
+            .ok_or(TableError::DependencyError(&"index_to_loc_format not found"))
+            .and_then(|format| {
+                LocaFormat::try_from(format.get()).map_err(|_| TableError::UnknownFormat)
+            })?;
 
         let num_glyphs = dir
             .maxp()
@@ -45,36 +62,29 @@ impl<'a> Table<'a> for Loca<'a> {
             .ok_or(TableError::DependencyError(&"num_glyphs not found"))?
             .get();
 
-        let loca = rec.raw_as::<LocaRaw>().unwrap();
+        let ptr = NonNull::from_ref(rec.raw_as::<()>().unwrap());
 
-        let (format, ptr) = match format {
-            0 => {
-                let req_len = (num_glyphs as usize + 1) * size_of::<Offset16>();
-                if (rec.length.get() as usize) < req_len {
-                    return Err(TableError::InvalidLen);
-                }
-                (LocaFormat::Short, loca.short_offsets.as_ptr().cast())
-            },
-            1 => {
-                let req_len = (num_glyphs as usize + 1) * size_of::<Offset32>();
-                if (rec.length.get() as usize) < req_len {
-                    return Err(TableError::InvalidLen);
-                }
-                (LocaFormat::Long, loca.long_offsets.as_ptr().cast())
-            },
-            _ => return Err(TableError::UnknownFormat),
-        };
+        let req_len = (num_glyphs as usize + 1) * format.stride() as usize;
+        if (rec.length.get() as usize) < req_len {
+            return Err(TableError::InvalidLen);
+        }
 
-        Ok(Self { num_glyphs, format, ptr, _phantom: Default::default() })
+        let loca = Self { ptr, num_glyphs, format, _phantom: Default::default() };
+
+        if !loca.iter_raw().is_sorted() {
+            return Err(TableError::Malformed(&"'loca' offsets not in order"));
+        }
+
+        Ok(loca)
     }
 }
 
 #[derive(Copy)]
 #[derive_const(Clone)]
 pub struct Loca<'a> {
+    ptr: NonNull<()>,
     num_glyphs: u16,
     format: LocaFormat,
-    ptr: *const (),
     _phantom: std::marker::PhantomData<&'a ()>,
 }
 
@@ -86,145 +96,107 @@ impl<'a> Loca<'a> {
         self.format
     }
     pub const fn offsets(&self) -> LocaOffsets<'a> {
+        let len = self.num_glyphs as usize + 1;
         match self.format {
             LocaFormat::Short => LocaOffsets::Short(unsafe {
-                std::slice::from_raw_parts(self.ptr.cast(), self.num_glyphs as usize)
+                std::slice::from_raw_parts(self.ptr.as_ptr().cast(), len)
             }),
             LocaFormat::Long => LocaOffsets::Long(unsafe {
-                std::slice::from_raw_parts(self.ptr.cast(), self.num_glyphs as usize)
+                std::slice::from_raw_parts(self.ptr.as_ptr().cast(), len)
             }),
         }
     }
 
-    pub const fn as_short(&self) -> Option<&[Offset16]> {
-        (self.format == LocaFormat::Short).then(const || unsafe {
-            std::slice::from_raw_parts(self.ptr.cast(), self.num_glyphs as usize + 1)
-        })
-    }
-    pub const fn as_long(&self) -> Option<&[Offset32]> {
-        (self.format == LocaFormat::Long).then(const || unsafe {
-            std::slice::from_raw_parts(self.ptr.cast(), self.num_glyphs as usize + 1)
-        })
+    pub fn range(&self, glyph_id: GlyphId) -> Option<Range<u32>> {
+        Some(self.iter().nth(glyph_id.get() as usize)?.1)
     }
 
-    pub const fn range(&self, glyph_id: GlyphId) -> Option<Range<u32>> {
-        if glyph_id.get() >= self.num_glyphs {
-            return None;
-        }
-
-        Some(match self.format {
-            LocaFormat::Short => unsafe { loca_range_short(self.ptr, glyph_id) },
-            LocaFormat::Long => unsafe { loca_range_long(self.ptr, glyph_id) },
-        })
+    pub fn iter_raw(&self) -> RawIter<'a> {
+        RawIter::new(*self)
     }
-    pub const fn offset(&self, glyph_id: GlyphId) -> Option<u32> {
-        Some(self.range(glyph_id)?.start)
-    }
-
-    pub const fn iter(&self) -> Iter<'_> {
+    pub fn iter(&self) -> Iter<'a> {
         Iter::new(*self)
     }
 }
 
-const unsafe fn loca_range_short(ptr: *const (), glyph_id: GlyphId) -> Range<u32> {
-    let idx = usize::from(glyph_id);
-    unsafe {
-        let this = (&*ptr.cast::<Offset16>().add(idx)).get() as u32;
-        let next = (&*ptr.cast::<Offset16>().add(idx + 1)).get() as u32;
-        this..next
+#[derive(Clone)]
+pub struct RawIter<'a> {
+    inner: PackedDualIter<'a, u32, Offset32, Offset16>,
+}
+impl<'a> RawIter<'a> {
+    pub fn new(loca: Loca<'a>) -> Self {
+        let inner = match loca.offsets() {
+            LocaOffsets::Long(offsets) => PackedDualIter::new_a(offsets),
+            LocaOffsets::Short(offsets) => PackedDualIter::new_b(offsets),
+        };
+        Self { inner }
     }
 }
-const unsafe fn loca_range_long(ptr: *const (), glyph_id: GlyphId) -> Range<u32> {
-    let idx = usize::from(glyph_id);
-    unsafe {
-        let this = (&*ptr.cast::<Offset32>().add(idx)).get();
-        let next = (&*ptr.cast::<Offset32>().add(idx + 1)).get();
-        this..next
-    }
-}
+custom_iterator!(RawIter<'a> as this {
+    type Item = u32;
+    map: |x| x;
+});
 
-const impl<'a> IntoIterator for Loca<'a> {
-    type Item = (GlyphId, Range<u32>);
-    type IntoIter = Iter<'a>;
-    fn into_iter(self) -> Self::IntoIter {
-        Iter::new(self)
-    }
-}
-const impl<'a> IntoIterator for &Loca<'a> {
-    type Item = (GlyphId, Range<u32>);
-    type IntoIter = Iter<'a>;
-    fn into_iter(self) -> Self::IntoIter {
-        Iter::new(*self)
-    }
-}
-
-// TODO: When std::slice::Iter's Clone is constified, make the derive const
 #[derive(Clone)]
 pub struct Iter<'a> {
+    inner: RawIter<'a>,
     glyph_id: u16,
-    num_glyphs: u16,
-    format: LocaFormat,
-    ptr: *const (),
-    _phantom: std::marker::PhantomData<&'a ()>,
+    prev: u32,
 }
-
 impl<'a> Iter<'a> {
-    pub const fn new(loca: Loca<'a>) -> Self {
-        Self {
-            glyph_id: 0,
-            num_glyphs: loca.num_glyphs,
-            format: loca.format,
-            ptr: loca.ptr,
-            _phantom: Default::default(),
-        }
+    pub fn new(loca: Loca<'a>) -> Self {
+        let mut inner = RawIter::new(loca);
+        let first = inner.next().unwrap();
+        Self { inner, glyph_id: 0, prev: first }
     }
 }
-
 impl<'a> Iterator for Iter<'a> {
     type Item = (GlyphId, Range<u32>);
     fn next(&mut self) -> Option<Self::Item> {
-        if self.glyph_id >= self.num_glyphs {
-            return None;
+        let next = self.inner.next()?;
+        let ret = (self.glyph_id.into(), self.prev..next);
+        self.prev = next;
+        self.glyph_id = self.glyph_id.wrapping_add(1);
+        Some(ret)
+    }
+    fn advance_by(&mut self, n: usize) -> Result<(), NonZero<usize>> {
+        let advance = self.len().min(n);
+        if advance > 0 {
+            self.prev = self.inner.nth(advance - 1).unwrap();
         }
-
-        let idx = GlyphId::new(self.glyph_id);
-        self.glyph_id += 1;
-
-        let range = match self.format {
-            LocaFormat::Short => unsafe { loca_range_short(self.ptr, idx) },
-            LocaFormat::Long => unsafe { loca_range_long(self.ptr, idx) },
-        };
-
-        Some((idx, range))
+        NonZero::new(n - advance).map_or(Ok(()), Err)
+    }
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.advance_by(n).ok()?;
+        self.next()
+    }
+    fn try_fold<B, F, R>(&mut self, init: B, mut f: F) -> R
+    where
+        F: FnMut(B, Self::Item) -> R,
+        R: std::ops::Try<Output = B>,
+    {
+        self.inner.try_fold(init, |init, next| {
+            let ret = (self.glyph_id.into(), self.prev..next);
+            self.prev = next;
+            self.glyph_id = self.glyph_id.wrapping_add(1);
+            f(init, ret)
+        })
+    }
+    fn fold<B, F>(mut self, init: B, mut f: F) -> B
+    where F: FnMut(B, Self::Item) -> B {
+        self.try_fold(init, |init, x| Ok::<_, !>(f(init, x))).unwrap()
     }
     fn last(mut self) -> Option<Self::Item> {
-        self.next_back()
+        self.nth(self.len() - 1)
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
         (len, Some(len))
     }
 }
-impl<'a> DoubleEndedIterator for Iter<'a> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        if self.num_glyphs <= self.glyph_id {
-            return None;
-        }
-
-        self.num_glyphs -= 1;
-        let idx = GlyphId::new(self.num_glyphs);
-
-        let range = match self.format {
-            LocaFormat::Short => unsafe { loca_range_short(self.ptr, idx) },
-            LocaFormat::Long => unsafe { loca_range_long(self.ptr, idx) },
-        };
-
-        Some((idx, range))
-    }
-}
-impl ExactSizeIterator for Iter<'_> {
+impl<'a> ExactSizeIterator for Iter<'a> {
     fn len(&self) -> usize {
-        (self.num_glyphs - self.glyph_id) as _
+        self.inner.len()
     }
 }
 
@@ -238,23 +210,24 @@ impl std::fmt::Debug for Loca<'_> {
         f.field("num_glyphs", &self.num_glyphs());
 
         f.field_with("offsets", |f| {
-            write!(f, "[")?;
+            write!(f, "{{")?;
 
-            let id_width = self.num_glyphs.ilog10() as usize + 1;
-            let last_range = self.iter().last();
-            let offset_width = last_range.clone().map_or(0, |x| x.1.start.ilog(16) as usize + 3);
+            let id_width = self.num_glyphs.checked_ilog10().unwrap_or(0) as usize + 1;
+            let last_offset = self.iter_raw().last();
+            let offset_width =
+                last_offset.and_then(|x| x.checked_ilog(16)).unwrap_or(0) as usize + 3;
 
-            for (glyph_id, offset) in self.iter() {
+            for (glyph_id, range) in self.iter() {
                 if glyph_id.get() % 5 == 0 {
                     write!(f, "\n   ")?;
                 }
-                write!(f, " {:id_width$}: {:#0offset_width$X},", glyph_id, offset.start)?;
+                write!(f, " {:id_width$}: {:#0offset_width$X},", glyph_id, range.start)?;
             }
-            if let Some(last_range) = last_range {
-                write!(f, " {:>id_width$}: {:#0offset_width$X},", "_", last_range.1.end)?;
+            if let Some(last_offset) = last_offset {
+                write!(f, " {:>id_width$}: {:#0offset_width$X},", "_", last_offset)?;
             }
 
-            write!(f, "\n]")
+            write!(f, "\n}}")
         });
 
         f.finish()

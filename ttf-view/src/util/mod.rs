@@ -1,8 +1,10 @@
+mod custom_iter;
 mod display_buffer;
-mod iter;
+mod packed_dual_iter;
 
+pub(crate) use custom_iter::*;
 pub(crate) use display_buffer::*;
-pub(crate) use iter::*;
+pub(crate) use packed_dual_iter::*;
 
 /// Utility macro for formatting wrapper types, like uint24, F2DOT14, GlyphId
 macro_rules! impl_fmt_with {

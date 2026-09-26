@@ -1,7 +1,7 @@
 use crate::{
     tables::{Table, TableError},
     types::{Offset32, Tag, tags, uint16, uint32},
-    util::iterator_map,
+    util::custom_iterator,
 };
 
 #[repr(C)]
@@ -147,9 +147,9 @@ impl<'a> TableRecordsIter<'a> {
         self.inner.as_slice()
     }
 }
-iterator_map!(TableRecordsIter<'a> {
+custom_iterator!(TableRecordsIter<'a> as this {
     type Item = TableRecord<'a>;
-    |this, x| TableRecord(this.dir, x)
+    map: |x| TableRecord(this.dir, x);
 });
 
 impl std::fmt::Debug for TableDirectory {

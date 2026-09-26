@@ -1,7 +1,7 @@
-macro_rules! iterator_map {
-    ($Iter:ty {
+macro_rules! custom_iterator {
+    ($Iter:ty as $this:ident {
         type Item = $Item:ty;
-        |$this:ident, $item:ident| $closure:expr
+        map: |$item:ident| $closure:expr;
     }) => {
         impl<'a> Iterator for $Iter {
             type Item = $Item;
@@ -37,6 +37,9 @@ macro_rules! iterator_map {
             }
         }
         impl<'a> ExactSizeIterator for $Iter {
+            fn is_empty(&self) -> bool {
+                self.inner.is_empty()
+            }
             fn len(&self) -> usize {
                 self.inner.len()
             }
@@ -70,4 +73,4 @@ macro_rules! iterator_map {
     };
 }
 
-pub(crate) use iterator_map;
+pub(crate) use custom_iterator;

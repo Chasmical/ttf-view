@@ -2,7 +2,7 @@ use crate::{
     platform::{EncodingError, EncodingId, PlatformId},
     tables::{Table, TableDirectory, TableError},
     types::{Offset16, Tag, tags, uint16},
-    util::iterator_map,
+    util::custom_iterator,
 };
 use std::{borrow::Cow, bstr::ByteStr};
 
@@ -226,9 +226,9 @@ impl<'a> NameRecordsIter<'a> {
         self.inner.as_slice()
     }
 }
-iterator_map!(NameRecordsIter<'a> {
+custom_iterator!(NameRecordsIter<'a> as this {
     type Item = NameRecord<'a>;
-    |this, x| NameRecord(this.table, x)
+    map: |x| NameRecord(this.table, x);
 });
 
 // TODO: When std::slice::Iter's Clone is constified, make the derive const
@@ -246,9 +246,9 @@ impl<'a> LangTagRecordsIter<'a> {
         self.inner.as_slice()
     }
 }
-iterator_map!(LangTagRecordsIter<'a> {
+custom_iterator!(LangTagRecordsIter<'a> as this {
     type Item = LangTagRecord<'a>;
-    |this, x| LangTagRecord(this.table, x)
+    map: |x| LangTagRecord(this.table, x);
 });
 
 impl std::fmt::Debug for Name<'_> {
