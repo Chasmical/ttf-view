@@ -64,6 +64,25 @@ macro_rules! impl_fixed_point_number {
             /// ```
             pub const MAX: Self = Self::new(Self::F_MAX).unwrap();
 
+            /// The value zero.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::ZERO, 0.0);")]
+            /// ```
+            pub const ZERO: Self = Self::new(0.0).unwrap();
+            /// The value one.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::ONE, 1.0);")]
+            /// ```
+            pub const ONE: Self = Self::new(1.0).unwrap();
+
             /// The amount of decimal places the type can accurately represent.
             ///
             /// # Examples
@@ -73,6 +92,16 @@ macro_rules! impl_fixed_point_number {
             #[doc = concat!("assert_eq!(", stringify!($Name), "::PRECISION, ", stringify!($d_precision), ");")]
             /// ```
             pub const PRECISION: u32 = (Self::F_STEP.recip() as u32).ilog10();
+
+            /// This type's integer fraction's denominator.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::DENOM, ", stringify!($d_denom), ");")]
+            /// ```
+            pub const DENOM: $int = $d_denom;
 
             #[doc = concat!("Creates a [`", stringify!($Name), "`] from [`", stringify!($fp), "`].")]
             ///
@@ -98,8 +127,6 @@ macro_rules! impl_fixed_point_number {
                 }
             }
             #[doc = concat!("Creates a [`", stringify!($Name), "`] from [`", stringify!($fp), "`] without checks.")]
-            ///
-            /// TODO: # Examples
             pub const unsafe fn new_unchecked(num: $fp) -> Self {
                 debug_assert!(matches!(num, Self::F_MIN..Self::F_MAX_EXCLUSIVE));
 
@@ -109,34 +136,30 @@ macro_rules! impl_fixed_point_number {
             }
 
             #[doc = concat!("Creates a [`", stringify!($Name), "`] from big-endian bytes.")]
-            ///
-            /// TODO: # Examples
             pub const fn from_be_bytes(bytes: [u8; $bytes]) -> Self {
                 Self(<$int>::from_be_bytes(bytes))
             }
             #[doc = concat!("Gets this [`", stringify!($Name), "`]'s big-endian bytes.")]
-            ///
-            /// TODO: # Examples
             pub const fn to_be_bytes(self) -> [u8; $bytes] {
                 self.0.to_be_bytes()
             }
 
-            #[doc = concat!("Returns this [`", stringify!($Name), "`] fraction's numerator")]
-            #[doc = concat!("(`", stringify!($Name), "` represented as <math><mfrac><mi>numerator</mi><mn>", stringify!($d_denom), "</mn></mfrac></math>).")]
-            ///
-            /// TODO: # Examples
+            #[doc = concat!("Creates a [`", stringify!($Name), "`] from its integer fraction's numerator")]
+            #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", stringify!($d_denom), "`</span><math><mfrac><mi>numerator</mi><mn>", stringify!($d_denom), "</mn></mfrac></math>).")]
+            pub const fn from_frac_num(numerator: $int) -> Self {
+                Self(numerator)
+            }
+            #[doc = concat!("Returns this [`", stringify!($Name), "`]'s integer fraction's numerator")]
+            #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", stringify!($d_denom), "`</span><math><mfrac><mi>numerator</mi><mn>", stringify!($d_denom), "</mn></mfrac></math>).")]
             pub const fn frac_num(&self) -> $int {
                 self.0
             }
+
             #[doc = concat!("Returns this [`", stringify!($Name), "`]'s value as [`", stringify!($fp), "`].")]
-            ///
-            /// TODO: # Examples
             pub const fn get(&self) -> $fp {
                 self.frac_num() as $fp * Self::F_STEP
             }
             #[doc = concat!("Rounds this [`", stringify!($Name), "`]'s value to [`PRECISION`][Self::PRECISION] decimal places.")]
-            ///
-            /// TODO: # Examples
             pub const fn round_to_precision(&self) -> $fp {
                 const SCALE: $fp = 10u32.pow($Name::PRECISION) as $fp;
                 (self.get() * SCALE).round() / SCALE
@@ -156,6 +179,19 @@ macro_rules! impl_fixed_point_number {
         const impl PartialOrd<$fp> for $Name {
             fn partial_cmp(&self, other: &$fp) -> Option<std::cmp::Ordering> {
                 self.get().partial_cmp(other)
+            }
+        }
+
+        const impl std::ops::Mul<$fp> for $Name {
+            type Output = $fp;
+            fn mul(self, other: $fp) -> Self::Output {
+                self.get().mul(other)
+            }
+        }
+        const impl std::ops::Div<$fp> for $Name {
+            type Output = $fp;
+            fn div(self, other: $fp) -> Self::Output {
+                self.get().div(other)
             }
         }
 

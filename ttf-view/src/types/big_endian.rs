@@ -1,5 +1,6 @@
 use crate::types::{
-    F2DOT14, Fixed, LongDateTime, Version16Dot16, int16, int32, int64, u24, uint16, uint32, uint64,
+    Affine2x2, F2DOT14, Fixed, LongDateTime, Version16Dot16, int16, int32, int64, u24, uint16,
+    uint32, uint64,
 };
 
 mod private {
@@ -42,6 +43,7 @@ impl_primitives! {
     u24, [u8; 3], |x| u24::from_be_bytes(x), |x| x.to_be_bytes();
     Version16Dot16, [u8; 4], |x| unsafe { Version16Dot16::from_be_bytes_unchecked(x) },
     |x| x.to_be_bytes();
+    Affine2x2, [u8; 8], |x| Affine2x2::from_be_bytes(x), |x| x.to_be_bytes();
 }
 
 #[derive(Copy)]

@@ -1,6 +1,6 @@
 use crate::{
     tables::glyf::Glyph,
-    types::{BigEndian, F2DOT14, int16, uint16},
+    types::{Affine2x2, BigEndian, F2DOT14, int16, uint16},
 };
 
 #[repr(C)]
@@ -49,21 +49,19 @@ impl Component {
             (a1.into(), a2.into())
         }
     }
-    pub const fn scale(&self) -> Option<(F2DOT14, F2DOT14, F2DOT14, F2DOT14)> {
+    pub const fn trabsform(&self) -> Option<Affine2x2> {
         let long_args = self.flags.intersects(ComponentFlags::ARG_1_AND_2_ARE_WORDS);
-        let args_len = if long_args { 4 } else { 2 };
-        let ptr = unsafe { self.data.as_ptr().byte_add(args_len) };
+        let ptr = unsafe { self.data.as_ptr().byte_add(if long_args { 4 } else { 2 }) };
 
         Some(unsafe {
             if self.flags.intersects(ComponentFlags::WE_HAVE_A_SCALE) {
                 let scale = (&*ptr.cast::<BigEndian<F2DOT14>>()).get();
-                (scale, F2DOT14::default(), F2DOT14::default(), scale)
+                Affine2x2::scale(scale)
             } else if self.flags.intersects(ComponentFlags::WE_HAVE_AN_X_AND_Y_SCALE) {
-                let [xx, yy] = *ptr.cast::<[BigEndian<F2DOT14>; 2]>();
-                (xx.get(), F2DOT14::default(), F2DOT14::default(), yy.get())
+                let [x, y] = *ptr.cast::<[BigEndian<F2DOT14>; 2]>();
+                Affine2x2::scale_xy(x.get(), y.get())
             } else if self.flags.intersects(ComponentFlags::WE_HAVE_A_TWO_BY_TWO) {
-                let [xx, xy, yx, yy] = *ptr.cast::<[BigEndian<F2DOT14>; 4]>();
-                (xx.get(), xy.get(), yx.get(), yy.get())
+                (&*ptr.cast::<BigEndian<Affine2x2>>()).get()
             } else {
                 return None;
             }

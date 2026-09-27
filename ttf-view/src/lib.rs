@@ -114,6 +114,7 @@
 #![feature(iter_advance_by)]
 #![feature(exact_size_is_empty)]
 #![feature(try_trait_v2)]
+#![feature(integer_casts)]
 #![allow(clippy::manual_non_exhaustive)]
 #![allow(clippy::missing_safety_doc)] // TODO: remove when adding docs
 
