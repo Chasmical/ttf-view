@@ -45,7 +45,18 @@ use std::fmt::Write;
 /// assert_eq!(format!("{:?}", dt), "2014-03-28T11:54:06Z");
 /// ```
 ///
+/// You can also format the date-time components yourself with [`ymd_hms_utc`].
+///
+/// ```
+/// use ttf_view::types::LongDateTime;
+///
+/// let dt = LongDateTime::from_epoch_seconds(0xfffffe407c80);
+/// let (y, M, d, h, m, s) = dt.ymd_hms_utc();
+/// assert_eq!(format!("Happy new year {}!", y), "Happy new year 8921490!");
+/// ```
+///
 /// [spec]: https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types
+/// [`ymd_hms_utc`]: LongDateTime::ymd_hms_utc
 #[derive(Copy, Hash)]
 #[derive_const(Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
@@ -154,6 +165,43 @@ impl LongDateTime {
         self.0
     }
 
+    /// Returns this [`LongDateTime`]'s date-time components in UTC time zone
+    /// (year, month, day, hour, minute, second).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ttf_view::types::LongDateTime;
+    ///
+    /// let dt = LongDateTime::from_epoch_seconds(0xfffffe407c80);
+    /// let (y, M, d, h, m, s) = dt.ymd_hms_utc();
+    /// assert_eq!(format!("Happy new year {}!", y), "Happy new year 8921490!");
+    /// ```
+    pub const fn ymd_hms_utc(&self) -> (i64, u8, u8, u8, u8, u8) {
+        const SECS_PER_DAY: i64 = 24 * 60 * 60;
+        let epoch_days = self.0.div_euclid(SECS_PER_DAY);
+        let secs = self.0.rem_euclid(SECS_PER_DAY);
+
+        // Convert "days since 1904" to "days since 1970"
+        let (year, month, day) = ymd_from_days(epoch_days - 24107);
+
+        const fn ymd_from_days(unix_days: i64) -> (i64, u8, u8) {
+            // See https://howardhinnant.github.io/date_algorithms.html#civil_from_days
+            let z = unix_days + 719468;
+            let era = if z >= 0 { z } else { z - 146096 } / 146097;
+            let doe = (z - era * 146097) as u64;
+            let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+            let y = yoe as i64 + era * 400;
+            let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+            let mp = (5 * doy + 2) / 153;
+            let d = doy - (153 * mp + 2) / 5 + 1;
+            let m = if mp < 10 { mp + 3 } else { mp - 9 };
+            (y + (m <= 2) as i64, m as u8, d as u8)
+        }
+
+        (year, month, day, (secs / 3600) as u8, ((secs % 3600) / 60) as u8, (secs % 60) as u8)
+    }
+
     /// Creates a [`LongDateTime`] from big-endian bytes.
     ///
     /// # Examples
@@ -205,84 +253,66 @@ const impl TryFrom<LongDateTime> for DateTime<Utc> {
 /// Formats [`LongDateTime`] as a human-readable timestamp. [See more above](#formatting)
 impl std::fmt::Display for LongDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        fmt_longdatetime(*self, false, f)
+        self._fmt_shared(false, f)
     }
 }
 /// Formats [`LongDateTime`] as an RFC 3339 and ISO 8601 timestamp. [See more above](#formatting)
 impl std::fmt::Debug for LongDateTime {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        fmt_longdatetime(*self, true, f)
+        self._fmt_shared(true, f)
     }
 }
 
-fn fmt_longdatetime(ldt: LongDateTime, iso: bool, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    let epoch_secs = ldt.epoch_seconds();
+impl LongDateTime {
+    fn _fmt_shared(&self, rfc_iso: bool, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // Get all the date and time components
+        let (year, month, day, hour, minute, second) = self.ymd_hms_utc();
 
-    const SECS_PER_DAY: i64 = 24 * 60 * 60;
-    let epoch_days = epoch_secs.div_euclid(SECS_PER_DAY);
-    let epoch_secs = epoch_secs.rem_euclid(SECS_PER_DAY);
+        // Max length is 32: "-292277022723-01-25 08:29:52 UTC"
+        let mut buf = DisplayBuffer::<32>::new();
 
-    // Convert "days since 1904" to "days since 1970"
-    let (year, month, day) = ymd_from_days(epoch_days - 24107);
+        if year > 9999 {
+            // ISO 8601 requires the explicit sign for out-of-range years
+            buf.write_byte_unchecked(b'+');
+        } else if year < 0 {
+            // Write minus separately to avoid counting it towards min width in "{:04}"
+            buf.write_byte_unchecked(b'-');
+        }
+        let year = year.unsigned_abs();
 
-    // Max length is 32: "-292277022723-01-25 08:29:52 UTC"
-    let mut buf = DisplayBuffer::<32>::new();
+        // Write "{:04}" with year (fast path for 0..=9999)
+        if matches!(year, 0..=9999) {
+            buf.write_two_digits_unchecked((year / 100) as u8);
+            buf.write_two_digits_unchecked((year % 100) as u8);
+        } else {
+            write!(buf, "{:04}", year)?;
+        }
 
-    if year > 9999 {
-        // ISO 8601 requires the explicit sign for out-of-range years
-        buf.write_byte_unchecked(b'+');
-    } else if year < 0 {
-        // Write minus separately to avoid counting it towards min width in "{:04}"
+        // Write "-{:02}-{:02}" with month and day
         buf.write_byte_unchecked(b'-');
+        buf.write_two_digits_unchecked(month);
+        buf.write_byte_unchecked(b'-');
+        buf.write_two_digits_unchecked(day);
+
+        // In Debug use 'T' as separator, and in Display - ' '
+        buf.write_byte_unchecked(if rfc_iso { b'T' } else { b' ' });
+
+        // Write "{:02}:{:02}:{:02}" with hour, min, sec
+        buf.write_two_digits_unchecked(hour);
+        buf.write_byte_unchecked(b':');
+        buf.write_two_digits_unchecked(minute);
+        buf.write_byte_unchecked(b':');
+        buf.write_two_digits_unchecked(second);
+
+        // In Debug use 'Z' for UTC, and in Display - " UTC"
+        if rfc_iso {
+            buf.write_byte_unchecked(b'Z');
+        } else {
+            buf.write_str_unchecked(" UTC");
+        }
+
+        f.write_str(buf.as_str())
     }
-    let year = year.unsigned_abs();
-
-    // Write "{:04}" with year (fast path for 0..=9999)
-    if matches!(year, 0..=9999) {
-        buf.write_two_digits_unchecked((year / 100) as u8);
-        buf.write_two_digits_unchecked((year % 100) as u8);
-    } else {
-        write!(buf, "{:04}", year)?;
-    }
-
-    // Write "-{:02}-{:02}" with month and day
-    buf.write_byte_unchecked(b'-');
-    buf.write_two_digits_unchecked(month);
-    buf.write_byte_unchecked(b'-');
-    buf.write_two_digits_unchecked(day);
-
-    // In Debug use 'T' as separator, and in Display - ' '
-    buf.write_byte_unchecked(if iso { b'T' } else { b' ' });
-
-    // Write "{:02}:{:02}:{:02}" with hour, min, sec
-    buf.write_two_digits_unchecked((epoch_secs / 3600) as u8);
-    buf.write_byte_unchecked(b':');
-    buf.write_two_digits_unchecked(((epoch_secs % 3600) / 60) as u8);
-    buf.write_byte_unchecked(b':');
-    buf.write_two_digits_unchecked((epoch_secs % 60) as u8);
-
-    // In Debug use 'Z' for UTC, and in Display - " UTC"
-    if iso {
-        buf.write_byte_unchecked(b'Z');
-    } else {
-        buf.write_str_unchecked(" UTC");
-    }
-
-    f.write_str(buf.as_str())
-}
-
-fn ymd_from_days(unix_days: i64) -> (i64, u8, u8) {
-    // See https://howardhinnant.github.io/date_algorithms.html#civil_from_days
-    let z = unix_days + 719468;
-    let era = if z >= 0 { z } else { z - 146096 } / 146097;
-    let doe = (z - era * 146097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    (y + (m <= 2) as i64, m as u8, d as u8)
 }
 
 #[cfg(test)]
