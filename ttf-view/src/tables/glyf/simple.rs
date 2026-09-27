@@ -1,9 +1,12 @@
-use crate::{tables::glyf::Glyph, types::uint16};
+use crate::{
+    tables::glyf::Glyph,
+    types::{int16, uint16},
+};
 use std::ptr::NonNull;
 
 #[repr(C)]
 pub struct SimpleGlyph {
-    header: Glyph,
+    base: Glyph,
     end_pts_of_contours: [uint16; 0],
     // : instruction_length: uint16,
     // : instructions: [u8; instruction_length],
@@ -15,7 +18,7 @@ pub struct SimpleGlyph {
 const impl std::ops::Deref for SimpleGlyph {
     type Target = Glyph;
     fn deref(&self) -> &Self::Target {
-        &self.header
+        &self.base
     }
 }
 
@@ -39,7 +42,7 @@ impl SimpleGlyph {
 }
 
 bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
     pub struct PointFlags: u8 {
         const ON_CURVE_POINT = 0x01;
         const X_IS_SHORT = 0x02;
@@ -83,11 +86,12 @@ pub struct Point {
 /// PointsIter<'a> will iterate through all flags, and parse the points.
 ///
 /// Flags need to be read until we get past (last end point index + 1)
-
 pub struct PointsIter<'a> {
     end_points_of_contours: NonNull<uint16>,
     number_of_contours: u16,
-    repeat_flag: u8,
+    point_index: u16,
+    repeat_flag: PointFlags,
+    repeat_count: u8,
     flags_ptr: NonNull<PointFlags>,
     x_coords: NonNull<()>,
     y_coords: NonNull<()>,
@@ -139,31 +143,100 @@ impl<'a> PointsIter<'a> {
     pub fn new(glyph: &'a SimpleGlyph) -> Self {
         let flags_ptr = glyph.flags_ptr();
         let points_count = glyph.end_pts_of_contours().last().map_or(0, |x| x.get() as u32) + 1;
-        let (flags_len, xs_len, ys_len) = find_lengths(flags_ptr, points_count);
+        let (flags_len, xs_len, _ys_len) = find_lengths(flags_ptr, points_count);
 
         Self {
             end_points_of_contours: NonNull::from_ref(&glyph.end_pts_of_contours).cast(),
             number_of_contours: glyph.number_of_contours.get() as u16,
-            repeat_flag: 0,
+            point_index: 0,
+            repeat_flag: PointFlags::default(),
+            repeat_count: 0,
             flags_ptr,
             x_coords: unsafe { flags_ptr.byte_add(flags_len as _).cast() },
             y_coords: unsafe { flags_ptr.byte_add((flags_len + xs_len) as _).cast() },
             _phantom: Default::default(),
         }
     }
+    pub const fn end_points_of_contours(&self) -> &[uint16] {
+        let len = self.number_of_contours as usize;
+        unsafe { std::slice::from_raw_parts(self.end_points_of_contours.as_ptr(), len) }
+    }
+    pub fn contour_index(&self, point_index: u16) -> Option<u16> {
+        self.end_points_of_contours().iter().position(|x| *x >= point_index).map(|x| x as u16)
+    }
 }
 
 impl<'a> Iterator for PointsIter<'a> {
-    type Item = Point;
+    type Item = (u16, Point);
     fn next(&mut self) -> Option<Self::Item> {
-        let flag = {
-            if self.repeat_flag != 0 {
-                self.repeat_flag -= 1;
+        let flag = unsafe {
+            if self.repeat_count != 0 {
+                self.repeat_count -= 1;
+                self.repeat_flag
             } else {
+                let next = self.flags_ptr.read();
+                self.flags_ptr = self.flags_ptr.byte_add(1);
+                if next.is_repeating() {
+                    self.repeat_flag = next;
+                    self.repeat_count = self.flags_ptr.read().bits();
+                    self.flags_ptr = self.flags_ptr.byte_add(1);
+                }
+                next
             }
-            unsafe { self.flags_ptr.read() }
         };
 
-        todo!()
+        use PointFlags as PF;
+        // | short | same_or_pos | value | size |
+        // |-------|-------------|-------|------|
+        // | 0 | 0 | int16 | 2 |
+        // | 0 | 1 | 0     | 0 |
+        // | 1 | 0 | - u8  | 1 |
+        // | 1 | 1 | + u8  | 1 |
+
+        let dx = unsafe {
+            match (flag.intersects(PF::X_IS_SHORT), flag.intersects(PF::X_IS_SAME_OR_POS)) {
+                (false, false) => {
+                    let dx = self.x_coords.cast::<int16>().as_ref().get();
+                    self.x_coords = self.x_coords.byte_add(2);
+                    dx
+                },
+                (false, true) => 0,
+                (true, false) => {
+                    let dx = self.x_coords.cast::<u8>().read();
+                    self.x_coords = self.x_coords.byte_add(1);
+                    -(dx as i16)
+                },
+                (true, true) => {
+                    let dx = self.x_coords.cast::<u8>().read();
+                    self.x_coords = self.x_coords.byte_add(1);
+                    dx as i16
+                },
+            }
+        };
+        let dy = unsafe {
+            match (flag.intersects(PF::Y_IS_SHORT), flag.intersects(PF::Y_IS_SAME_OR_POS)) {
+                (false, false) => {
+                    let dy = self.y_coords.cast::<int16>().as_ref().get();
+                    self.y_coords = self.y_coords.byte_add(2);
+                    dy
+                },
+                (false, true) => 0,
+                (true, false) => {
+                    let dy = self.y_coords.cast::<u8>().read();
+                    self.y_coords = self.y_coords.byte_add(1);
+                    -(dy as i16)
+                },
+                (true, true) => {
+                    let dy = self.y_coords.cast::<u8>().read();
+                    self.y_coords = self.y_coords.byte_add(1);
+                    dy as i16
+                },
+            }
+        };
+
+        let idx = self.point_index;
+        self.point_index = self.point_index.wrapping_add(1);
+
+        Some((idx, Point { flags: flag, dx, dy }))
     }
 }

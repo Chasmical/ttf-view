@@ -63,4 +63,19 @@ impl Glyph {
     pub const fn is_composite(&self) -> bool {
         !self.is_simple()
     }
+
+    pub const fn as_simple(&self) -> Option<&SimpleGlyph> {
+        if self.is_simple() {
+            Some(unsafe { std::mem::transmute::<&Self, &SimpleGlyph>(self) })
+        } else {
+            None
+        }
+    }
+    pub const fn as_composite(&self) -> Option<&CompositeGlyph> {
+        if self.is_composite() {
+            Some(unsafe { std::mem::transmute::<&Self, &CompositeGlyph>(self) })
+        } else {
+            None
+        }
+    }
 }

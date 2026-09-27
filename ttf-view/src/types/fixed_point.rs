@@ -20,7 +20,7 @@ macro_rules! impl_fixed_point_number {
         /// [spec]: https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types
         $(#[$outer])*
         #[derive(Copy, Hash)]
-        #[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
+        #[derive_const(Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
         #[repr(transparent)]
         $vis struct $Name($int);
 
