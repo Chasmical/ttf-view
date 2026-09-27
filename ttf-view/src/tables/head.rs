@@ -1,6 +1,6 @@
 use crate::{
     tables::{Table, TableDirectory, TableError},
-    types::{Fixed, LongDateTime, Tag, int16, tags, uint16, uint32},
+    types::{BigEndian, Fixed, LongDateTime, Tag, int16, tags, uint16, uint32},
 };
 
 #[repr(C)]
@@ -14,13 +14,13 @@ pub struct HeadV0 {
 pub struct HeadV1 {
     v0: HeadV0,
     // version = 1.x:
-    pub font_revision: Fixed,
+    pub font_revision: BigEndian<Fixed>,
     pub checksum_adjustment: uint32,
     pub magic_number: uint32,
     pub flags: uint16,
     pub units_per_em: uint16,
-    pub created: LongDateTime,
-    pub modified: LongDateTime,
+    pub created: BigEndian<LongDateTime>,
+    pub modified: BigEndian<LongDateTime>,
     pub x_min: int16,
     pub y_min: int16,
     pub x_max: int16,
@@ -80,9 +80,17 @@ impl<'a> Head<'a> {
         }
     }
 
+    // TODO: We've got two options here, we either:
+    // 1) return Option<&T>, references to big-endian fields, which probably should be fine.
+    //    It would make writing some low-level utils a bit easier. But on the other hand it
+    //    postpones the endianness conversion, which could be inconvenient.
+    // 2) return Option<T>, endianness-converted values. Convenient, and users don't need to
+    //    depend on zerocopy to have the return types available (HeadV0, HeadV1 will still have
+    //    zerocopy's types though).
+
     // version = 1.x:
     pub const fn font_revision(&self) -> Option<Fixed> {
-        Some(self.v1()?.font_revision)
+        Some(self.v1()?.font_revision.get())
     }
     pub const fn checksum_adjustment(&self) -> Option<uint32> {
         Some(self.v1()?.checksum_adjustment)
@@ -97,10 +105,10 @@ impl<'a> Head<'a> {
         Some(self.v1()?.units_per_em)
     }
     pub const fn created(&self) -> Option<LongDateTime> {
-        Some(self.v1()?.created)
+        Some(self.v1()?.created.get())
     }
     pub const fn modified(&self) -> Option<LongDateTime> {
-        Some(self.v1()?.modified)
+        Some(self.v1()?.modified.get())
     }
     pub const fn x_min(&self) -> Option<int16> {
         Some(self.v1()?.x_min)

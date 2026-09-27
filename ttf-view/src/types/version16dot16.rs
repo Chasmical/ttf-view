@@ -8,9 +8,9 @@ use std::{fmt, num::ParseIntError};
 ///
 /// [spec]: https://learn.microsoft.com/en-us/typography/opentype/spec/otff#table-version-numbers
 #[derive(Copy, Hash)]
-#[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive_const(Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct Version16Dot16([u8; 4]);
+pub struct Version16Dot16(u32);
 
 impl Version16Dot16 {
     /// Version 0.5.
@@ -45,9 +45,8 @@ impl Version16Dot16 {
     /// assert_eq!(unsafe { Version16Dot16::new_unchecked(0xFFFF, 9).tuple() }, (0xFFFF, 9));
     /// ```
     pub const unsafe fn new_unchecked(major: u16, minor: u8) -> Self {
-        debug_assert!(minor <= 9);
-        let raw = ((major as u32) << 16) | ((minor as u32) << 12);
-        Self(raw.to_be_bytes())
+        // Note: no debug_assert! here, because we kinda want to support invalid minor bytes too.
+        Self(((major as u32) << 16) | ((minor as u32) << 12))
     }
 
     /// Creates a [`Version16Dot16`] from big-endian bytes.
@@ -65,7 +64,7 @@ impl Version16Dot16 {
     /// ```
     pub const fn from_be_bytes(bytes: [u8; 4]) -> Option<Self> {
         match bytes {
-            [_, _, x @ 0x00..=0x90, 0] if (x & 0x0F) == 0 => Some(Self(bytes)),
+            [_, _, x @ 0x00..=0x90, 0] if (x & 0x0F) == 0 => Some(Self(u32::from_be_bytes(bytes))),
             _ => None,
         }
     }
@@ -81,8 +80,8 @@ impl Version16Dot16 {
     /// assert_eq!(unsafe { Version16Dot16::from_be_bytes_unchecked([0x12, 0x34, 0x90, 0x00]).tuple() }, (0x1234, 9));
     /// ```
     pub const unsafe fn from_be_bytes_unchecked(bytes: [u8; 4]) -> Self {
-        debug_assert!(Self::from_be_bytes(bytes).is_some());
-        Self(bytes)
+        // Note: no debug_assert! here, because we kinda want to support invalid minor bytes too.
+        Self(u32::from_be_bytes(bytes))
     }
     /// Gets this [`Version16Dot16`]'s big-endian bytes.
     ///
@@ -96,7 +95,7 @@ impl Version16Dot16 {
     /// assert_eq!(Version16Dot16::new(0x1234, 9).unwrap().to_be_bytes(), [0x12, 0x34, 0x90, 0x00]);
     /// ```
     pub const fn to_be_bytes(self) -> [u8; 4] {
-        self.0
+        self.0.to_be_bytes()
     }
 
     /// Gets this [`Version16Dot16`]'s major version number.
@@ -111,7 +110,7 @@ impl Version16Dot16 {
     /// assert_eq!(Version16Dot16::new(0xFFFF, 5).unwrap().major(), 0xFFFF);
     /// ```
     pub const fn major(&self) -> u16 {
-        u16::from_be_bytes(*self.0.first_chunk::<2>().unwrap())
+        (self.0 >> 16) as u16
     }
     /// Gets this [`Version16Dot16`]'s minor version number.
     ///
@@ -125,7 +124,7 @@ impl Version16Dot16 {
     /// assert_eq!(Version16Dot16::new(0xFFFF, 5).unwrap().minor(), 5);
     /// ```
     pub const fn minor(&self) -> u8 {
-        self.0[2] >> 4
+        ((self.0 & 0xFFFF) >> 12) as u8
     }
     /// Gets this [`Version16Dot16`]'s major and minor version numbers as a tuple.
     ///
@@ -140,14 +139,6 @@ impl Version16Dot16 {
     /// ```
     pub const fn tuple(&self) -> (u16, u8) {
         (self.major(), self.minor())
-    }
-}
-
-// TODO: When [u8; 4]'s Default is constified, replace this impl with #[derive_const]
-#[allow(clippy::derivable_impls)]
-const impl Default for Version16Dot16 {
-    fn default() -> Self {
-        Self([0; 4])
     }
 }
 

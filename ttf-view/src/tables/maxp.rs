@@ -1,13 +1,13 @@
 use crate::{
     tables::{Table, TableDirectory, TableError},
-    types::{Tag, Version16Dot16, tags, uint16},
+    types::{BigEndian, Tag, Version16Dot16, tags, uint16},
 };
 
 #[repr(C)]
 pub struct MaxpV0 {
     _exhaustive_but_dont_instantiate: (),
     // version any:
-    pub version: Version16Dot16,
+    pub version: BigEndian<Version16Dot16>,
 }
 #[repr(C)]
 pub struct MaxpV05 {
@@ -53,7 +53,7 @@ impl<'a> Table<'a> for Maxp<'a> {
         let rec = dir.table_record(Self::TAG).ok_or(TableError::NotFound)?;
         let v0 = rec.raw_as::<MaxpV0>().ok_or(TableError::InvalidLen)?;
 
-        let required_len = match v0.version.tuple() {
+        let required_len = match v0.version.get().tuple() {
             (0, ..=4) => size_of::<MaxpV0>() as u32,
             (0, 5..) => size_of::<MaxpV05>() as u32,
             (1, _) => size_of::<MaxpV1>() as u32,
@@ -82,7 +82,7 @@ const impl<'a> std::ops::Deref for Maxp<'a> {
 
 impl<'a> Maxp<'a> {
     pub const fn v05(&self) -> Option<&'a MaxpV05> {
-        let (major, minor) = self.version.tuple();
+        let (major, minor) = self.version.get().tuple();
         if major == 0 && minor >= 5 || major == 1 {
             Some(unsafe { std::mem::transmute::<&MaxpV0, &MaxpV05>(self.maxp) })
         } else {
@@ -90,7 +90,7 @@ impl<'a> Maxp<'a> {
         }
     }
     pub const fn v1(&self) -> Option<&'a MaxpV1> {
-        if self.version.major() == 1 {
+        if self.version.get().major() == 1 {
             Some(unsafe { std::mem::transmute::<&MaxpV0, &MaxpV1>(self.maxp) })
         } else {
             None

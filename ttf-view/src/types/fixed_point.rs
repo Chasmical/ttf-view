@@ -20,9 +20,9 @@ macro_rules! impl_fixed_point_number {
         /// [spec]: https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types
         $(#[$outer])*
         #[derive(Copy, Hash)]
-        #[derive_const(Clone, PartialEq, Eq)]
+        #[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
         #[repr(transparent)]
-        $vis struct $Name([u8; $bytes]);
+        $vis struct $Name($int);
 
         const _: () = {
             assert!(size_of::<$int>() == $bytes);
@@ -105,20 +105,20 @@ macro_rules! impl_fixed_point_number {
 
                 // Note: No need to worry about 1.9999999 wrapping to -2, because `as` here
                 // converts in a saturating way (even Infinity becomes 0xFFFF through `as`).
-                Self(((num / Self::F_STEP).round() as $int).to_be_bytes())
+                Self((num / Self::F_STEP).round() as $int)
             }
 
             #[doc = concat!("Creates a [`", stringify!($Name), "`] from big-endian bytes.")]
             ///
             /// TODO: # Examples
             pub const fn from_be_bytes(bytes: [u8; $bytes]) -> Self {
-                Self(bytes)
+                Self(<$int>::from_be_bytes(bytes))
             }
             #[doc = concat!("Gets this [`", stringify!($Name), "`]'s big-endian bytes.")]
             ///
             /// TODO: # Examples
             pub const fn to_be_bytes(self) -> [u8; $bytes] {
-                self.0
+                self.0.to_be_bytes()
             }
 
             #[doc = concat!("Returns this [`", stringify!($Name), "`] fraction's numerator")]
@@ -126,7 +126,7 @@ macro_rules! impl_fixed_point_number {
             ///
             /// TODO: # Examples
             pub const fn frac_num(&self) -> $int {
-                <$int>::from_be_bytes(self.0)
+                self.0
             }
             #[doc = concat!("Returns this [`", stringify!($Name), "`]'s value as [`", stringify!($fp), "`].")]
             ///
@@ -146,17 +146,6 @@ macro_rules! impl_fixed_point_number {
         impl_fmt_with! {
             Debug, Display, LowerExp, UpperExp:
             |x: &$Name| x.get()
-        }
-
-        const impl PartialOrd for $Name {
-            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-        const impl Ord for $Name {
-            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                self.frac_num().cmp(&other.frac_num())
-            }
         }
 
         const impl PartialEq<$fp> for $Name {

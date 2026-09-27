@@ -47,9 +47,9 @@ use std::fmt::Write;
 ///
 /// [spec]: https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types
 #[derive(Copy, Hash)]
-#[derive_const(Clone, PartialEq, Eq)]
+#[derive_const(Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct LongDateTime([u8; 8]);
+pub struct LongDateTime(i64);
 
 const EPOCH_NAIVE: NaiveDateTime =
     NaiveDate::from_ymd_opt(1904, 1, 1).unwrap().and_hms_opt(0, 0, 0).unwrap();
@@ -70,7 +70,7 @@ impl LongDateTime {
     /// # use ttf_view::types::LongDateTime;
     /// assert_eq!(LongDateTime::MIN.to_string(), "-292277022723-01-25 08:29:52 UTC");
     /// ```
-    pub const MIN: Self = Self::from_epoch_seconds(i64::MIN);
+    pub const MIN: Self = Self(i64::MIN);
     /// The largest representable [`LongDateTime`].
     ///
     /// # Examples
@@ -79,7 +79,7 @@ impl LongDateTime {
     /// # use ttf_view::types::LongDateTime;
     /// assert_eq!(LongDateTime::MAX.to_string(), "+292277026530-12-04 15:30:07 UTC");
     /// ```
-    pub const MAX: Self = Self::from_epoch_seconds(i64::MAX);
+    pub const MAX: Self = Self(i64::MAX);
 
     /// Creates a [`LongDateTime`] from [`chrono::DateTime<Utc>`]. Truncates sub-seconds.
     ///
@@ -134,7 +134,7 @@ impl LongDateTime {
     /// assert_eq!(LongDateTime::from_epoch_seconds(3478852446).to_string(), "2014-03-28 11:54:06 UTC");
     /// ```
     pub const fn from_epoch_seconds(secs: i64) -> Self {
-        Self(i64::to_be_bytes(secs))
+        Self(secs)
     }
     /// Returns the number of seconds from [`EPOCH`][Self::EPOCH] (`1904-01-01 00:00:00 UTC`)
     /// to this [`LongDateTime`]'s value.
@@ -151,7 +151,7 @@ impl LongDateTime {
     /// assert_eq!(LongDateTime::new(dt).epoch_seconds(), 3478852446);
     /// ```
     pub const fn epoch_seconds(&self) -> i64 {
-        i64::from_be_bytes(self.0)
+        self.0
     }
 
     /// Creates a [`LongDateTime`] from big-endian bytes.
@@ -167,7 +167,7 @@ impl LongDateTime {
     /// assert_eq!(LongDateTime::from_be_bytes(raw).to_string(), "2014-03-28 11:54:06 UTC");
     /// ```
     pub const fn from_be_bytes(bytes: [u8; 8]) -> Self {
-        Self(bytes)
+        Self(i64::from_be_bytes(bytes))
     }
     /// Returns this [`LongDateTime`]'s big-endian bytes.
     ///
@@ -186,26 +186,7 @@ impl LongDateTime {
     /// assert_eq!(LongDateTime::new(dt).to_be_bytes(), raw);
     /// ```
     pub const fn to_be_bytes(self) -> [u8; 8] {
-        self.0
-    }
-}
-
-// TODO: When [u8; 8]'s Default is constified, replace this impl with #[derive_const]
-#[allow(clippy::derivable_impls)]
-const impl Default for LongDateTime {
-    fn default() -> Self {
-        Self([0; 8])
-    }
-}
-// Note: PartialEq + Eq impls need to be explicit, because [u8; 8] is compared unsignedly.
-const impl PartialOrd for LongDateTime {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-const impl Ord for LongDateTime {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.epoch_seconds().cmp(&other.epoch_seconds())
+        self.0.to_be_bytes()
     }
 }
 
