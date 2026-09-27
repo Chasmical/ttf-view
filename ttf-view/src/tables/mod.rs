@@ -4,6 +4,7 @@ mod directory;
 pub use directory::*;
 
 pub mod cmap;
+pub mod glyf;
 pub mod head;
 pub mod hhea;
 pub mod hmtx;
@@ -15,6 +16,9 @@ pub mod os_2;
 impl TableDirectory {
     // Note: Even though these tables are required, we'll still use Option here
     pub fn cmap(&self) -> Result<cmap::Cmap<'_>, TableError> {
+        self.table()
+    }
+    pub fn glyf(&self) -> Result<glyf::Glyf<'_>, TableError> {
         self.table()
     }
     pub fn head(&self) -> Result<head::Head<'_>, TableError> {
