@@ -125,26 +125,90 @@ impl Affine2x3 {
         Self::rotation(degrees.to_radians())
     }
 
-    // TODO: docs
-    pub const fn transform_f64(&self, x: f64, y: f64) -> (f64, f64) {
+    /// Applies this [`Affine2x3`] transformation to the point
+    /// <span class="hidden">`[x, y, 1]`</span>
+    /// <math><mo>\[</mo><mi>x</mi><mo> </mo><mi>y</mi><mo> </mo><mn>1</mn><mo>\]</mo></math>:
+    ///
+    /// <code class="hidden">\[x,y,1\]×\[xx,yx; xy,yy; dx,dy\]=\[xx\*x+xy\*y+dx, yx\*x+yy\*y+dy\]</code>
+    /// <math>
+    ///   <mrow><mo>\[</mo><mi>x</mi><mo> </mo><mi>y</mi><mo> </mo><mn>1</mn><mo>\]</mo></mrow>
+    ///   <mo>×</mo>
+    ///   <mo>\[</mo><mtable>
+    ///     <mtr><mtd><mi>xx</mi></mtd><mtd><mi>yx</mi></mtd></mtr>
+    ///     <mtr><mtd><mi>xy</mi></mtd><mtd><mi>yy</mi></mtd></mtr>
+    ///     <mtr><mtd><mi>dx</mi></mtd><mtd><mi>dy</mi></mtd></mtr>
+    ///   </mtable><mo>\]</mo>
+    ///   <mo>=</mo>
+    ///   <mrow><mo>\[</mo>
+    ///     <mi>xx</mi><mo>\*</mo><mi>x</mi><mo>+</mo><mi>xy</mi><mo>\*</mo><mi>y</mi>
+    ///     <mo>+</mo><mi>dx</mi>
+    ///   <mo>, </mo>
+    ///     <mi>yx</mi><mo>\*</mo><mi>x</mi><mo>+</mo><mi>yy</mi><mo>\*</mo><mi>y</mi>
+    ///     <mo>+</mo><mi>dy</mi>
+    ///   <mo>\]</mo></mrow>
+    /// </math>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ttf_view::types::Affine2x3;
+    ///
+    /// assert_eq!(Affine2x3::IDENTITY.map_f64(10.0, -10.0), (10.0, -10.0));
+    /// assert_eq!(Affine2x3::IDENTITY.map_f64(-2583.2, 1842.2), (-2583.2, 1842.2));
+    ///
+    /// let rot90 = Affine2x3::rotation_degrees(90.0);
+    /// assert_eq!(rot90.map_f64(23.5, 9.8), (9.8, -23.5));
+    /// ```
+    pub const fn map(&self, x: Fixed, y: Fixed) -> (Fixed, Fixed) {
+        let new_x = Fixed::saturating_maddp(self.xx, x, self.xy, y, self.dx);
+        let new_y = Fixed::saturating_maddp(self.yx, x, self.yy, y, self.dy);
+        (new_x, new_y)
+    }
+
+    /// Applies this [`Affine2x3`] transformation to the point
+    /// <span class="hidden">`[x, y, 1]`</span>
+    /// <math><mo>\[</mo><mi>x</mi><mo> </mo><mi>y</mi><mo> </mo><mn>1</mn><mo>\]</mo></math>.
+    pub const fn map_f64(&self, x: f64, y: f64) -> (f64, f64) {
         (self.xx * x + self.xy * y + self.dx.get(), self.yx * x + self.yy * y + self.dy.get())
     }
 
-    pub const fn transform_i32(&self, x: i32, y: i32) -> (i32, i32) {
-        let (x, y) = (x as i64, y as i64);
+    //  self   ×  other
+    // [A B 0]   [a b 0]   [Aa+Bc   Ab+Bd   0]   [xx*xx+yx*xy    xx*yx+yx*yy    0]
+    // [C D 0] × [c d 0] = [Ca+Dc   Cb+Dd   0] = [xy*xx+yy*xy    xy*yx+yy*yy    0]
+    // [X Y 1]   [x y 1]   [Xa+Yc+x Xb+Yd+y 1]   [dx*xx+dy*xy+dx dx*yx+dy*yy+dy 1]
 
-        /// See implementation notes in [`super::Affine2x2::transform_i16`].
-        struct __;
-
-        let x_num = (self.xx.frac_num() as i64 * x)
-            .saturating_add(self.xy.frac_num() as i64 * y)
-            .saturating_add(self.dx.frac_num() as i64);
-        let y_num = (self.yx.frac_num() as i64 * x)
-            .saturating_add(self.yy.frac_num() as i64 * y)
-            .saturating_add(self.dy.frac_num() as i64);
-
-        const DENOM: i64 = Fixed::DENOM as i64;
-        ((x_num / DENOM).saturating_cast(), (y_num / DENOM).saturating_cast())
+    /// Multiplies this [`Affine2x3`] by another, wrapping and truncating at [`Fixed`]'s bounds.
+    pub const fn wrapping_mul(self, other: Self) -> Self {
+        Self::new(
+            Fixed::wrapping_maddp(self.xx, other.xx, self.yx, other.xy, Fixed::ZERO),
+            Fixed::wrapping_maddp(self.xx, other.yx, self.yx, other.yy, Fixed::ZERO),
+            Fixed::wrapping_maddp(self.xy, other.xx, self.yy, other.xy, Fixed::ZERO),
+            Fixed::wrapping_maddp(self.xy, other.yx, self.yy, other.yy, Fixed::ZERO),
+            Fixed::wrapping_maddp(self.dx, other.xx, self.dy, other.xy, self.dx),
+            Fixed::wrapping_maddp(self.dx, other.yx, self.dy, other.yy, self.dy),
+        )
+    }
+    /// Multiplies this [`Affine2x3`] by another, saturating at [`Fixed`]'s bounds.
+    pub const fn saturating_mul(self, other: Self) -> Self {
+        Self::new(
+            Fixed::saturating_maddp(self.xx, other.xx, self.yx, other.xy, Fixed::ZERO),
+            Fixed::saturating_maddp(self.xx, other.yx, self.yx, other.yy, Fixed::ZERO),
+            Fixed::saturating_maddp(self.xy, other.xx, self.yy, other.xy, Fixed::ZERO),
+            Fixed::saturating_maddp(self.xy, other.yx, self.yy, other.yy, Fixed::ZERO),
+            Fixed::saturating_maddp(self.dx, other.xx, self.dy, other.xy, self.dx),
+            Fixed::saturating_maddp(self.dx, other.yx, self.dy, other.yy, self.dy),
+        )
+    }
+    /// Multiplies this [`Affine2x3`] by another, returning `None` if overflow occurs.
+    pub const fn checked_mul(self, other: Self) -> Option<Self> {
+        Some(Self::new(
+            Fixed::checked_maddp(self.xx, other.xx, self.yx, other.xy, Fixed::ZERO)?,
+            Fixed::checked_maddp(self.xx, other.yx, self.yx, other.yy, Fixed::ZERO)?,
+            Fixed::checked_maddp(self.xy, other.xx, self.yy, other.xy, Fixed::ZERO)?,
+            Fixed::checked_maddp(self.xy, other.yx, self.yy, other.yy, Fixed::ZERO)?,
+            Fixed::checked_maddp(self.dx, other.xx, self.dy, other.xy, self.dx)?,
+            Fixed::checked_maddp(self.dx, other.yx, self.dy, other.yy, self.dy)?,
+        ))
     }
 
     /// Creates an [`Affine2x3`] from big-endian bytes.
@@ -180,9 +244,27 @@ impl Affine2x3 {
     pub const fn to_tuple_f64(&self) -> (f64, f64, f64, f64, f64, f64) {
         (self.xx.get(), self.yx.get(), self.xy.get(), self.yy.get(), self.dx.get(), self.dy.get())
     }
+
+    /// Creates an [`Affine2x3`] from a `[xx, yx, xy, yy, dx, dy]` array.
+    pub const fn from_array([xx, yx, xy, yy, dx, dy]: [Fixed; 6]) -> Self {
+        Self { xx, yx, xy, yy, dx, dy }
+    }
+    /// Returns this [`Affine2x3`]'s `[xx, yx, xy, yy, dx, dy]` as an array.
+    pub const fn to_array(self) -> [Fixed; 6] {
+        [self.xx, self.yx, self.xy, self.yy, self.dx, self.dy]
+    }
 }
 
-// TODO: impl std::ops::Mul for Affine2x3
+/// Performs multiplication `*` (panics on overflow in debug configuration).
+const impl std::ops::Mul for Affine2x3 {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        #[cfg(debug_assertions)]
+        return self.checked_mul(rhs).expect("attempt to multiply with overflow");
+        #[cfg(not(debug_assertions))]
+        return self.wrapping_mul(rhs);
+    }
+}
 
 impl std::fmt::Debug for Affine2x3 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

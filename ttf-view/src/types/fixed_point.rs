@@ -5,7 +5,7 @@ macro_rules! impl_fixed_point_number {
         $(#[$outer:meta])*
         $vis:vis struct $Name:ident(
             $int:ty as [u8; $bytes:literal];
-            $integer_bits:literal | $fraction_bits:literal as $fp:ty
+            $integer_bits:literal | $fraction_bits:literal as $fp:ty, $wide:ty
         );
         DENOM = $d_denom:literal;
         STEP = $d_step:literal;
@@ -164,12 +164,118 @@ macro_rules! impl_fixed_point_number {
                 const SCALE: $fp = 10u32.pow($Name::PRECISION) as $fp;
                 (self.get() * SCALE).round() / SCALE
             }
+
+            /// Widening numerator multiplication: x/d * y/d = xy/dd.
+            ///
+            /// Don't forget to divide the wide numerator by [`DENOM`][Self::DENOM] before casting
+            /// it back to [`Self`] with [`from_frac_num`][Self::from_frac_num].
+            pub(crate) const fn wmul(self, rhs: Self) -> $wide {
+                self.0.widening_mul(rhs.0)
+            }
+
+            pub const fn wrapping_add(self, rhs: Self) -> Self {
+                Self(self.0.wrapping_add(rhs.0))
+            }
+            pub const fn wrapping_sub(self, rhs: Self) -> Self {
+                Self(self.0.wrapping_sub(rhs.0))
+            }
+            pub const fn wrapping_mul(self, rhs: Self) -> Self {
+                Self((self.wmul(rhs) / Self::DENOM as $wide) as $int)
+            }
+            pub const fn wrapping_div(self, rhs: Self) -> Self {
+                Self((self.wmul(Self::ONE) / rhs.0 as $wide) as $int)
+            }
+
+            pub const fn saturating_add(self, rhs: Self) -> Self {
+                Self(self.0.saturating_add(rhs.0))
+            }
+            pub const fn saturating_sub(self, rhs: Self) -> Self {
+                Self(self.0.saturating_sub(rhs.0))
+            }
+            pub const fn saturating_mul(self, rhs: Self) -> Self {
+                Self((self.wmul(rhs) / Self::DENOM as $wide).saturating_cast())
+            }
+            pub const fn saturating_div(self, rhs: Self) -> Self {
+                Self((self.wmul(Self::ONE) / rhs.0 as $wide).saturating_cast())
+            }
+
+            pub const fn checked_add(self, rhs: Self) -> Option<Self> {
+                self.0.checked_add(rhs.0).map(Self)
+            }
+            pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
+                self.0.checked_sub(rhs.0).map(Self)
+            }
+            pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
+                (self.wmul(rhs) / Self::DENOM as $wide).checked_cast().map(Self)
+            }
+            pub const fn checked_div(self, rhs: Self) -> Option<Self> {
+                (self.wmul(Self::ONE) / rhs.0 as $wide).checked_cast().map(Self)
+            }
+
+            /// Wrapping product sum operation (ab+cd+p)
+            pub(crate) const fn wrapping_maddp(a: Self, b: Self, c: Self, d: Self, p: Self) -> Self {
+                let sum = a.wmul(b).wrapping_add(c.wmul(d)) / Self::DENOM as $wide;
+                Self(sum.wrapping_add(p.0 as $wide) as $int)
+            }
+            /// Saturating product sum operation (ab+cd+p)
+            pub(crate) const fn saturating_maddp(a: Self, b: Self, c: Self, d: Self, p: Self) -> Self {
+                let sum = a.wmul(b).saturating_add(c.wmul(d)) / Self::DENOM as $wide;
+                Self(sum.saturating_add(p.0 as $wide).saturating_cast())
+            }
+            /// Checked product sum operation (ab+cd+p)
+            pub(crate) const fn checked_maddp(a: Self, b: Self, c: Self, d: Self, p: Self) -> Option<Self> {
+                let sum = a.wmul(b).checked_add(c.wmul(d))? / Self::DENOM as $wide;
+                Some(Self(sum.checked_add(p.0 as $wide)?.try_into().ok()?))
+            }
         }
 
-        impl_fmt_with! {
-            Debug, Display, LowerExp, UpperExp:
-            |x: &$Name| x.get()
+        /// Performs addition `+` (panics on overflow in debug configuration).
+        const impl std::ops::Add for $Name {
+            type Output = Self;
+            fn add(self, rhs: Self) -> Self::Output {
+                #[cfg(debug_assertions)]
+                { self.checked_add(rhs).expect("attempt to add with overflow") }
+                #[cfg(not(debug_assertions))]
+                { self.wrapping_add(rhs) }
+            }
         }
+        /// Performs subtraction `-` (panics on overflow in debug configuration).
+        const impl std::ops::Sub for $Name {
+            type Output = Self;
+            fn sub(self, rhs: Self) -> Self::Output {
+                #[cfg(debug_assertions)]
+                { self.checked_sub(rhs).expect("attempt to subtract with overflow") }
+                #[cfg(not(debug_assertions))]
+                { self.wrapping_sub(rhs) }
+            }
+        }
+        /// Performs multiplication `*` (panics on overflow in debug configuration).
+        const impl std::ops::Mul for $Name {
+            type Output = Self;
+            fn mul(self, rhs: Self) -> Self::Output {
+                #[cfg(debug_assertions)]
+                { self.checked_mul(rhs).expect("attempt to multiply with overflow") }
+                #[cfg(not(debug_assertions))]
+                { self.wrapping_mul(rhs) }
+            }
+        }
+        /// Performs division `/` (panics on overflow in debug configuration).
+        ///
+        /// # Panics
+        ///
+        /// This operation will panic if `other == 0`.
+        const impl std::ops::Div for $Name {
+            type Output = Self;
+            fn div(self, rhs: Self) -> Self::Output {
+                #[cfg(debug_assertions)]
+                { self.checked_div(rhs).expect("attempt to divide with overflow") }
+                #[cfg(not(debug_assertions))]
+                { self.wrapping_div(rhs) }
+            }
+        }
+
+        impl_fmt_with! { Debug, Display, LowerExp, UpperExp: |x: &$Name| x.get() }
+        impl_fmt_with! { Binary, LowerHex, UpperHex: |x: &$Name| x.0 }
 
         const impl PartialEq<$fp> for $Name {
             fn eq(&self, other: &$fp) -> bool {
@@ -217,7 +323,7 @@ macro_rules! impl_fixed_point_number {
 
 // The constants specified here are re-calculated in the macro and then validated in doc-tests.
 impl_fixed_point_number! {
-    pub struct Fixed(i32 as [u8; 4]; 16|16 as f64);
+    pub struct Fixed(i32 as [u8; 4]; 16|16 as f64, i64);
     DENOM = 65536;
     STEP = 0.0000152587890625;
     MIN = -32768.0;
@@ -225,7 +331,7 @@ impl_fixed_point_number! {
     PRECISION = 4;
 }
 impl_fixed_point_number! {
-    pub struct F2DOT14(i16 as [u8; 2]; 2|14 as f32);
+    pub struct F2DOT14(i16 as [u8; 2]; 2|14 as f32, i32);
     DENOM = 16384;
     STEP = 0.000061035156;
     MIN = -2.0;
@@ -286,7 +392,7 @@ mod tests {
         ];
 
         for (raw, fp) in nums {
-            let real = Fixed::new(fp).unwrap().frac_num() as u32;
+            let real = Fixed::new(fp).unwrap().0 as u32;
             assert_eq!(real, raw, "{real:#X} != {raw:#X} ({fp})");
 
             let real = Fixed::new(fp).unwrap().get();
@@ -317,7 +423,7 @@ mod tests {
         ];
 
         for (raw, fp) in nums {
-            let real = F2DOT14::new(fp).unwrap().frac_num() as u16;
+            let real = F2DOT14::new(fp).unwrap().0 as u16;
             assert_eq!(real, raw, "{real:#X} != {raw:#X} ({fp})");
 
             let real = F2DOT14::new(fp).unwrap().get();

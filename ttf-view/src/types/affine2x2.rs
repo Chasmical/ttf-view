@@ -32,6 +32,8 @@ impl Affine2x2 {
     ///   <mtr><mtd><mn>0</mn></mtd><mtd><mn>1</mn></mtd></mtr>
     /// </mtable><mo>]</mo></math>.
     ///
+    /// # Examples
+    ///
     /// ```
     /// # use ttf_view::types::Affine2x2;
     /// assert_eq!(Affine2x2::IDENTITY.to_tuple_f32(), (1.0, 0.0, 0.0, 1.0));
@@ -114,78 +116,69 @@ impl Affine2x2 {
     ///   <mo>\]</mo></mrow>
     /// </math>
     ///
+    /// # Examples
+    ///
     /// ```
     /// use ttf_view::types::Affine2x2;
     ///
-    /// assert_eq!(Affine2x2::IDENTITY.transform_f32(10.0, -10.0), (10.0, -10.0));
-    /// assert_eq!(Affine2x2::IDENTITY.transform_f32(-2583.2, 1842.2), (-2583.2, 1842.2));
+    /// assert_eq!(Affine2x2::IDENTITY.map_f32(10.0, -10.0), (10.0, -10.0));
+    /// assert_eq!(Affine2x2::IDENTITY.map_f32(-2583.2, 1842.2), (-2583.2, 1842.2));
     ///
     /// let rot90 = Affine2x2::rotation_degrees(90.0);
-    /// assert_eq!(rot90.transform_f32(23.5, 9.8), (9.8, -23.5));
+    /// assert_eq!(rot90.map_f32(23.5, 9.8), (9.8, -23.5));
     /// ```
-    pub const fn transform_f32(&self, x: f32, y: f32) -> (f32, f32) {
-        (self.xx * x + self.xy * y, self.yx * x + self.yy * y)
+    pub const fn map(&self, x: F2DOT14, y: F2DOT14) -> (F2DOT14, F2DOT14) {
+        let new_x = F2DOT14::saturating_maddp(self.xx, x, self.xy, y, F2DOT14::ZERO);
+        let new_y = F2DOT14::saturating_maddp(self.yx, x, self.yy, y, F2DOT14::ZERO);
+        (new_x, new_y)
     }
 
     /// Applies this [`Affine2x2`] transformation to the point
     /// <span class="hidden">`[x, y]`</span>
     /// <math><mo>\[</mo><mi>x</mi><mo> </mo><mi>y</mi><mo>\]</mo></math>.
-    ///
-    /// ```
-    /// use ttf_view::types::Affine2x2;
-    ///
-    /// assert_eq!(Affine2x2::IDENTITY.transform_i16(100, -100), (100, -100));
-    /// assert_eq!(Affine2x2::IDENTITY.transform_i16(-25832, 18422), (-25832, 18422));
-    ///
-    /// let rot90 = Affine2x2::rotation_degrees(90.0);
-    /// assert_eq!(rot90.transform_i16(235, 98), (98, -235));
-    /// ```
-    pub const fn transform_i16(&self, x: i16, y: i16) -> (i16, i16) {
-        let (x, y) = (x as i32, y as i32);
-
-        // Multiply the coords by F2DOT14's numerators, and then divide them by the denominator.
-        //
-        // Both x, y, and numerators can be in range -32768..=32767.
-        // The absolute maximum that can be reached is 2147483648 (= -32768*-32768+-32768*-32768).
-        // The absolute minimum that can be reached is -2147418112 (= -32768*32767+-32768*32767).
-        // The maximum is 1 above i32's max, so we need to use saturating_add here.
-
-        let x_num = (self.xx.frac_num() as i32 * x).saturating_add(self.xy.frac_num() as i32 * y);
-        let y_num = (self.yx.frac_num() as i32 * x).saturating_add(self.yy.frac_num() as i32 * y);
-
-        // After dividing by DENOM, the range of values would be -131072..=131071,
-        // which is outside i16's range, so we need to use saturating_cast here.
-        const DENOM: i32 = F2DOT14::DENOM as i32;
-        ((x_num / DENOM).saturating_cast(), (y_num / DENOM).saturating_cast())
+    pub const fn map_i16(&self, x: i16, y: i16) -> (i16, i16) {
+        // Cast X and Y to F2DOT14 and back. The results will be the same, since F2DOT14 is
+        // essentially just a wrapper over i16, and there's only scaling and no translation.
+        let (x, y) = self.map(F2DOT14::from_frac_num(x), F2DOT14::from_frac_num(y));
+        (x.frac_num(), y.frac_num())
+    }
+    /// Applies this [`Affine2x2`] transformation to the point
+    /// <span class="hidden">`[x, y]`</span>
+    /// <math><mo>\[</mo><mi>x</mi><mo> </mo><mi>y</mi><mo>\]</mo></math>.
+    pub const fn map_f32(&self, x: f32, y: f32) -> (f32, f32) {
+        (self.xx * x + self.xy * y, self.yx * x + self.yy * y)
     }
 
-    /// Multiplies this [`Affine2x2`] by another, returning `None` if overflow occurs.
-    pub const fn checked_mul(&self, other: Self) -> Option<Self> {
-        const fn mul(a: F2DOT14, b: F2DOT14, c: F2DOT14, d: F2DOT14) -> Option<F2DOT14> {
-            let u = a.frac_num() as i32 * b.frac_num() as i32;
-            let v = c.frac_num() as i32 * d.frac_num() as i32;
-            Some(F2DOT14::from_frac_num(u.checked_add(v)?.try_into().ok()?))
-        }
-        Some(Self::new(
-            mul(self.xx, other.xx, self.yx, other.xy)?,
-            mul(self.xx, other.yx, self.yx, other.yy)?,
-            mul(self.xy, other.xx, self.yy, other.xy)?,
-            mul(self.xy, other.yx, self.yy, other.yy)?,
-        ))
+    // self  × other
+    // [A B] × [a b] = [Aa+Bc Ab+Bd] = [xx*xx+yx*xy xx*yx+yx*yy]
+    // [C D]   [c d]   [Ca+Dc Cb+Dd]   [xy*xx+yy*xy xy*yx+yy*yy]
+
+    /// Multiplies this [`Affine2x2`] by another, wrapping and truncating at [`F2DOT14`]'s bounds.
+    pub const fn wrapping_mul(&self, rhs: Self) -> Self {
+        Self::new(
+            F2DOT14::wrapping_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2DOT14::ZERO),
+            F2DOT14::wrapping_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2DOT14::ZERO),
+            F2DOT14::wrapping_maddp(self.xy, rhs.xx, self.yy, rhs.xy, F2DOT14::ZERO),
+            F2DOT14::wrapping_maddp(self.xy, rhs.yx, self.yy, rhs.yy, F2DOT14::ZERO),
+        )
     }
     /// Multiplies this [`Affine2x2`] by another, saturating at [`F2DOT14`]'s bounds.
-    pub const fn saturating_mul(&self, other: Self) -> Self {
-        const fn mul(a: F2DOT14, b: F2DOT14, c: F2DOT14, d: F2DOT14) -> F2DOT14 {
-            let u = a.frac_num() as i32 * b.frac_num() as i32;
-            let v = c.frac_num() as i32 * d.frac_num() as i32;
-            F2DOT14::from_frac_num(u.saturating_add(v).saturating_cast())
-        }
+    pub const fn saturating_mul(&self, rhs: Self) -> Self {
         Self::new(
-            mul(self.xx, other.xx, self.yx, other.xy),
-            mul(self.xx, other.yx, self.yx, other.yy),
-            mul(self.xy, other.xx, self.yy, other.xy),
-            mul(self.xy, other.yx, self.yy, other.yy),
+            F2DOT14::saturating_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2DOT14::ZERO),
+            F2DOT14::saturating_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2DOT14::ZERO),
+            F2DOT14::saturating_maddp(self.xy, rhs.xx, self.yy, rhs.xy, F2DOT14::ZERO),
+            F2DOT14::saturating_maddp(self.xy, rhs.yx, self.yy, rhs.yy, F2DOT14::ZERO),
         )
+    }
+    /// Multiplies this [`Affine2x2`] by another, returning `None` if overflow occurs.
+    pub const fn checked_mul(&self, rhs: Self) -> Option<Self> {
+        Some(Self::new(
+            F2DOT14::checked_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2DOT14::ZERO)?,
+            F2DOT14::checked_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2DOT14::ZERO)?,
+            F2DOT14::checked_maddp(self.xy, rhs.xx, self.yy, rhs.xy, F2DOT14::ZERO)?,
+            F2DOT14::checked_maddp(self.xy, rhs.yx, self.yy, rhs.yy, F2DOT14::ZERO)?,
+        ))
     }
 
     /// Creates an [`Affine2x2`] from big-endian bytes.
@@ -217,13 +210,25 @@ impl Affine2x2 {
     pub const fn to_tuple_f32(&self) -> (f32, f32, f32, f32) {
         (self.xx.get(), self.yx.get(), self.xy.get(), self.yy.get())
     }
+
+    /// Creates an [`Affine2x2`] from a `[xx, yx, xy, yy]` array.
+    pub const fn from_array([xx, yx, xy, yy]: [F2DOT14; 4]) -> Self {
+        Self { xx, yx, xy, yy }
+    }
+    /// Returns this [`Affine2x2`]'s `[xx, yx, xy, yy]` as an array.
+    pub const fn to_array(self) -> [F2DOT14; 4] {
+        [self.xx, self.yx, self.xy, self.yy]
+    }
 }
 
-/// Multiplies this [`Affine2x2`] by another, saturating at [`F2DOT14`]'s bounds.
+/// Performs multiplication `*` (panics on overflow in debug configuration).
 const impl std::ops::Mul for Affine2x2 {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
-        self.saturating_mul(rhs)
+        #[cfg(debug_assertions)]
+        return self.checked_mul(rhs).expect("attempt to multiply with overflow");
+        #[cfg(not(debug_assertions))]
+        return self.wrapping_mul(rhs);
     }
 }
 
