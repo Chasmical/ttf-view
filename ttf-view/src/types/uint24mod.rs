@@ -132,6 +132,9 @@ impl u24 {
     pub const fn wrapping_mul(self, rhs: Self) -> Self {
         Self(self.0.wrapping_mul(rhs.0) & Self::MAX.0)
     }
+    /// # Panics
+    ///
+    /// This function will panic if `rhs == 0`.
     pub const fn wrapping_div(self, rhs: Self) -> Self {
         Self(self.0.wrapping_div(rhs.0) & Self::MAX.0)
     }
@@ -145,6 +148,9 @@ impl u24 {
     pub const fn saturating_mul(self, rhs: Self) -> Self {
         Self(self.0.widening_mul(rhs.0).min(Self::MAX.0 as u64) as u32)
     }
+    /// # Panics
+    ///
+    /// This function will panic if `rhs == 0`.
     pub const fn saturating_div(self, rhs: Self) -> Self {
         Self(self.0.saturating_div(rhs.0))
     }
@@ -197,7 +203,7 @@ const impl std::ops::Mul for u24 {
 ///
 /// # Panics
 ///
-/// This operation will panic if `other == 0`.
+/// This operation will panic if `rhs == 0`.
 const impl std::ops::Div for u24 {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {

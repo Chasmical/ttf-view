@@ -182,6 +182,9 @@ macro_rules! impl_fixed_point_number {
             pub const fn wrapping_mul(self, rhs: Self) -> Self {
                 Self((self.wmul(rhs) / Self::DENOM as $wide) as $int)
             }
+            /// # Panics
+            ///
+            /// This function panics if `rhs == 0`.
             pub const fn wrapping_div(self, rhs: Self) -> Self {
                 Self((self.wmul(Self::ONE) / rhs.0 as $wide) as $int)
             }
@@ -195,6 +198,9 @@ macro_rules! impl_fixed_point_number {
             pub const fn saturating_mul(self, rhs: Self) -> Self {
                 Self((self.wmul(rhs) / Self::DENOM as $wide).saturating_cast())
             }
+            /// # Panics
+            ///
+            /// This function panics if `rhs == 0`.
             pub const fn saturating_div(self, rhs: Self) -> Self {
                 Self((self.wmul(Self::ONE) / rhs.0 as $wide).saturating_cast())
             }
@@ -209,7 +215,7 @@ macro_rules! impl_fixed_point_number {
                 (self.wmul(rhs) / Self::DENOM as $wide).checked_cast().map(Self)
             }
             pub const fn checked_div(self, rhs: Self) -> Option<Self> {
-                (self.wmul(Self::ONE) / rhs.0 as $wide).checked_cast().map(Self)
+                (self.wmul(Self::ONE).checked_div(rhs.0 as $wide)?).checked_cast().map(Self)
             }
 
             /// Wrapping product sum operation (ab+cd+p)
@@ -263,7 +269,7 @@ macro_rules! impl_fixed_point_number {
         ///
         /// # Panics
         ///
-        /// This operation will panic if `other == 0`.
+        /// This operation will panic if `rhs == 0`.
         const impl std::ops::Div for $Name {
             type Output = Self;
             fn div(self, rhs: Self) -> Self::Output {
