@@ -7,11 +7,11 @@ macro_rules! impl_fixed_point_number {
             $int:ty as [u8; $bytes:literal];
             $integer_bits:literal | $fraction_bits:literal as $fp:ty, $wide:ty
         );
-        DENOM = $d_denom:literal;
-        STEP = $d_step:literal;
-        MIN = $d_min:literal;
-        MAX = $d_max:literal;
-        PRECISION = $d_precision:literal;
+        DENOM = $denom:literal;
+        STEP = $step:literal;
+        MIN = $min:literal;
+        MAX = $max:literal;
+        PRECISION = $precision:literal;
     ) => {
         #[doc = concat!("The [OpenType ", stringify!($Name), "][spec] type, a ")]
         #[doc = concat!(stringify!($integer_bits), ".", stringify!($fraction_bits), "-bit")]
@@ -41,7 +41,7 @@ macro_rules! impl_fixed_point_number {
             ///
             /// ```
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::STEP, ", stringify!($d_step), ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::STEP, ", stringify!($step), ");")]
             /// ```
             pub const STEP: Self = Self::new(Self::F_STEP).unwrap();
 
@@ -51,7 +51,7 @@ macro_rules! impl_fixed_point_number {
             ///
             /// ```
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::MIN, ", stringify!($d_min), ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::MIN, ", stringify!($min), ");")]
             /// ```
             pub const MIN: Self = Self::new(Self::F_MIN).unwrap();
             /// The largest value that can be represented by this type.
@@ -60,7 +60,7 @@ macro_rules! impl_fixed_point_number {
             ///
             /// ```
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::MAX, ", stringify!($d_max), ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::MAX, ", stringify!($max), ");")]
             /// ```
             pub const MAX: Self = Self::new(Self::F_MAX).unwrap();
 
@@ -89,7 +89,7 @@ macro_rules! impl_fixed_point_number {
             ///
             /// ```
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::PRECISION, ", stringify!($d_precision), ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::PRECISION, ", stringify!($precision), ");")]
             /// ```
             pub const PRECISION: u32 = (Self::F_STEP.recip() as u32).ilog10();
 
@@ -99,9 +99,9 @@ macro_rules! impl_fixed_point_number {
             ///
             /// ```
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::DENOM, ", stringify!($d_denom), ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::DENOM, ", stringify!($denom), ");")]
             /// ```
-            pub const DENOM: $int = $d_denom;
+            pub const DENOM: $int = Self::ONE.0;
 
             #[doc = concat!("Creates a [`", stringify!($Name), "`] from [`", stringify!($fp), "`].")]
             ///
@@ -145,12 +145,12 @@ macro_rules! impl_fixed_point_number {
             }
 
             #[doc = concat!("Creates a [`", stringify!($Name), "`] from its integer fraction's numerator")]
-            #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", stringify!($d_denom), "`</span><math><mfrac><mi>numerator</mi><mn>", stringify!($d_denom), "</mn></mfrac></math>).")]
+            #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", stringify!($denom), "`</span><math><mfrac><mi>numerator</mi><mn>", stringify!($denom), "</mn></mfrac></math>).")]
             pub const fn from_frac_num(numerator: $int) -> Self {
                 Self(numerator)
             }
             #[doc = concat!("Returns this [`", stringify!($Name), "`]'s integer fraction's numerator")]
-            #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", stringify!($d_denom), "`</span><math><mfrac><mi>numerator</mi><mn>", stringify!($d_denom), "</mn></mfrac></math>).")]
+            #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", stringify!($denom), "`</span><math><mfrac><mi>numerator</mi><mn>", stringify!($denom), "</mn></mfrac></math>).")]
             pub const fn frac_num(&self) -> $int {
                 self.0
             }
@@ -180,7 +180,7 @@ macro_rules! impl_fixed_point_number {
                 Self(self.0.wrapping_sub(rhs.0))
             }
             pub const fn wrapping_mul(self, rhs: Self) -> Self {
-                Self((self.wmul(rhs) / Self::DENOM as $wide) as $int)
+                Self((self.wmul(rhs) / $denom) as $int)
             }
             /// # Panics
             ///
@@ -196,7 +196,7 @@ macro_rules! impl_fixed_point_number {
                 Self(self.0.saturating_sub(rhs.0))
             }
             pub const fn saturating_mul(self, rhs: Self) -> Self {
-                Self((self.wmul(rhs) / Self::DENOM as $wide).saturating_cast())
+                Self((self.wmul(rhs) / $denom).saturating_cast())
             }
             /// # Panics
             ///
@@ -212,7 +212,7 @@ macro_rules! impl_fixed_point_number {
                 self.0.checked_sub(rhs.0).map(Self)
             }
             pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
-                (self.wmul(rhs) / Self::DENOM as $wide).checked_cast().map(Self)
+                (self.wmul(rhs) / $denom).checked_cast().map(Self)
             }
             pub const fn checked_div(self, rhs: Self) -> Option<Self> {
                 (self.wmul(Self::ONE).checked_div(rhs.0 as $wide)?).checked_cast().map(Self)
@@ -220,17 +220,17 @@ macro_rules! impl_fixed_point_number {
 
             /// Wrapping product sum operation (ab+cd+p)
             pub(crate) const fn wrapping_maddp(a: Self, b: Self, c: Self, d: Self, p: Self) -> Self {
-                let sum = a.wmul(b).wrapping_add(c.wmul(d)) / Self::DENOM as $wide;
+                let sum = a.wmul(b).wrapping_add(c.wmul(d)) / $denom;
                 Self(sum.wrapping_add(p.0 as $wide) as $int)
             }
             /// Saturating product sum operation (ab+cd+p)
             pub(crate) const fn saturating_maddp(a: Self, b: Self, c: Self, d: Self, p: Self) -> Self {
-                let sum = a.wmul(b).saturating_add(c.wmul(d)) / Self::DENOM as $wide;
+                let sum = a.wmul(b).saturating_add(c.wmul(d)) / $denom;
                 Self(sum.saturating_add(p.0 as $wide).saturating_cast())
             }
             /// Checked product sum operation (ab+cd+p)
             pub(crate) const fn checked_maddp(a: Self, b: Self, c: Self, d: Self, p: Self) -> Option<Self> {
-                let sum = a.wmul(b).checked_add(c.wmul(d))? / Self::DENOM as $wide;
+                let sum = a.wmul(b).checked_add(c.wmul(d))? / $denom;
                 Some(Self(sum.checked_add(p.0 as $wide)?.try_into().ok()?))
             }
         }
@@ -310,12 +310,12 @@ macro_rules! impl_fixed_point_number {
         impl std::str::FromStr for $Name {
             type Err = ();
             fn from_str(s: &str) -> Result<Self, Self::Err> {
-                <$fp>::from_str(s).or(Err(())).and_then($Name::try_from)
+                <$fp>::from_str(s).or(Err(())).and_then(Self::try_from)
             }
         }
         const impl TryFrom<$fp> for $Name {
             type Error = ();
-            fn try_from(value: $fp) -> Result<$Name, Self::Error> {
+            fn try_from(value: $fp) -> Result<Self, Self::Error> {
                 Self::new(value).ok_or(())
             }
         }
