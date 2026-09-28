@@ -1,6 +1,6 @@
-use crate::types::F2DOT14;
+use crate::types::F2Dot14;
 
-/// A simple [`F2DOT14`] 2×2 affine transformation
+/// A simple [`F2Dot14`] 2×2 affine transformation
 /// <span class="hidden">`[xx, yx; xy, yy]`</span>
 /// <math><mo>[</mo><mtable>
 ///   <mtr><mtd><mi>xx</mi></mtd><mtd><mi>yx</mi></mtd></mtr>
@@ -9,13 +9,13 @@ use crate::types::F2DOT14;
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Affine2x2 {
     /// X-component of transformed X-basis vector.
-    pub xx: F2DOT14,
+    pub xx: F2Dot14,
     /// Y-component of transformed X-basis vector (aka. `scale01` in `glyf`).
-    pub yx: F2DOT14, // aka. scale01
+    pub yx: F2Dot14, // aka. scale01
     /// X-component of transformed Y-basis vector (aka. `scale10` in `glyf`).
-    pub xy: F2DOT14, // aka. scale10
+    pub xy: F2Dot14, // aka. scale10
     /// Y-component of transformed Y-basis vector.
-    pub yy: F2DOT14,
+    pub yy: F2Dot14,
 }
 
 const impl Default for Affine2x2 {
@@ -38,7 +38,7 @@ impl Affine2x2 {
     /// # use ttf_view::types::Affine2x2;
     /// assert_eq!(Affine2x2::IDENTITY.to_tuple_f32(), (1.0, 0.0, 0.0, 1.0));
     /// ```
-    pub const IDENTITY: Self = Self::scale(F2DOT14::ONE);
+    pub const IDENTITY: Self = Self::scale(F2Dot14::ONE);
 
     /// Creates an [`Affine2x2`] with
     /// <span class="hidden">`[xx, yx; xy, yy]`</span>
@@ -46,7 +46,7 @@ impl Affine2x2 {
     ///   <mtr><mtd><mi>xx</mi></mtd><mtd><mi>yx</mi></mtd></mtr>
     ///   <mtr><mtd><mi>xy</mi></mtd><mtd><mi>yy</mi></mtd></mtr>
     /// </mtable><mo>]</mo></math>.
-    pub const fn new(xx: F2DOT14, yx: F2DOT14, xy: F2DOT14, yy: F2DOT14) -> Self {
+    pub const fn new(xx: F2Dot14, yx: F2Dot14, xy: F2Dot14, yy: F2Dot14) -> Self {
         Self { xx, yx, xy, yy }
     }
 
@@ -56,8 +56,8 @@ impl Affine2x2 {
     ///   <mtr><mtd><mi>scale</mi></mtd><mtd><mn>0</mn></mtd></mtr>
     ///   <mtr><mtd><mn>0</mn></mtd><mtd><mi>scale</mi></mtd></mtr>
     /// </mtable><mo>]</mo></math>.
-    pub const fn scale(scale: F2DOT14) -> Self {
-        Self::new(scale, F2DOT14::ZERO, F2DOT14::ZERO, scale)
+    pub const fn scale(scale: F2Dot14) -> Self {
+        Self::new(scale, F2Dot14::ZERO, F2Dot14::ZERO, scale)
     }
     /// Creates an [`Affine2x2`] with
     /// <span class="hidden">`[x, 0; 0, y]`</span>
@@ -65,8 +65,8 @@ impl Affine2x2 {
     ///   <mtr><mtd><mi>x</mi></mtd><mtd><mn>0</mn></mtd></mtr>
     ///   <mtr><mtd><mn>0</mn></mtd><mtd><mi>y</mi></mtd></mtr>
     /// </mtable><mo>]</mo></math>.
-    pub const fn scale_xy(x: F2DOT14, y: F2DOT14) -> Self {
-        Self::new(x, F2DOT14::ZERO, F2DOT14::ZERO, y)
+    pub const fn scale_xy(x: F2Dot14, y: F2Dot14) -> Self {
+        Self::new(x, F2Dot14::ZERO, F2Dot14::ZERO, y)
     }
 
     /// Creates an [`Affine2x2`] with
@@ -79,10 +79,10 @@ impl Affine2x2 {
     pub fn rotation(radians: f32) -> Self {
         let (sin, cos) = radians.sin_cos();
         Self::new(
-            F2DOT14::new(cos).unwrap(),
-            F2DOT14::new(-sin).unwrap(),
-            F2DOT14::new(sin).unwrap(),
-            F2DOT14::new(cos).unwrap(),
+            F2Dot14::new(cos).unwrap(),
+            F2Dot14::new(-sin).unwrap(),
+            F2Dot14::new(sin).unwrap(),
+            F2Dot14::new(cos).unwrap(),
         )
     }
     /// Creates an [`Affine2x2`] with
@@ -127,9 +127,9 @@ impl Affine2x2 {
     /// let rot90 = Affine2x2::rotation_degrees(90.0);
     /// assert_eq!(rot90.map_f32(23.5, 9.8), (9.8, -23.5));
     /// ```
-    pub const fn map(&self, x: F2DOT14, y: F2DOT14) -> (F2DOT14, F2DOT14) {
-        let new_x = F2DOT14::saturating_maddp(self.xx, x, self.xy, y, F2DOT14::ZERO);
-        let new_y = F2DOT14::saturating_maddp(self.yx, x, self.yy, y, F2DOT14::ZERO);
+    pub const fn map(&self, x: F2Dot14, y: F2Dot14) -> (F2Dot14, F2Dot14) {
+        let new_x = F2Dot14::saturating_maddp(self.xx, x, self.xy, y, F2Dot14::ZERO);
+        let new_y = F2Dot14::saturating_maddp(self.yx, x, self.yy, y, F2Dot14::ZERO);
         (new_x, new_y)
     }
 
@@ -137,9 +137,9 @@ impl Affine2x2 {
     /// <span class="hidden">`[x, y]`</span>
     /// <math><mo>\[</mo><mi>x</mi><mo> </mo><mi>y</mi><mo>\]</mo></math>.
     pub const fn map_i16(&self, x: i16, y: i16) -> (i16, i16) {
-        // Cast X and Y to F2DOT14 and back. The results will be the same, since F2DOT14 is
+        // Cast X and Y to F2Dot14 and back. The results will be the same, since F2Dot14 is
         // essentially just a wrapper over i16, and there's only scaling and no translation.
-        let (x, y) = self.map(F2DOT14::from_frac_num(x), F2DOT14::from_frac_num(y));
+        let (x, y) = self.map(F2Dot14::from_frac_num(x), F2Dot14::from_frac_num(y));
         (x.frac_num(), y.frac_num())
     }
     /// Applies this [`Affine2x2`] transformation to the point
@@ -153,31 +153,31 @@ impl Affine2x2 {
     // [A B] × [a b] = [Aa+Bc Ab+Bd] = [xx*xx+yx*xy xx*yx+yx*yy]
     // [C D]   [c d]   [Ca+Dc Cb+Dd]   [xy*xx+yy*xy xy*yx+yy*yy]
 
-    /// Multiplies this [`Affine2x2`] by another, wrapping and truncating at [`F2DOT14`]'s bounds.
+    /// Multiplies this [`Affine2x2`] by another, wrapping and truncating at [`F2Dot14`]'s bounds.
     pub const fn wrapping_mul(&self, rhs: Self) -> Self {
         Self::new(
-            F2DOT14::wrapping_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2DOT14::ZERO),
-            F2DOT14::wrapping_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2DOT14::ZERO),
-            F2DOT14::wrapping_maddp(self.xy, rhs.xx, self.yy, rhs.xy, F2DOT14::ZERO),
-            F2DOT14::wrapping_maddp(self.xy, rhs.yx, self.yy, rhs.yy, F2DOT14::ZERO),
+            F2Dot14::wrapping_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2Dot14::ZERO),
+            F2Dot14::wrapping_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2Dot14::ZERO),
+            F2Dot14::wrapping_maddp(self.xy, rhs.xx, self.yy, rhs.xy, F2Dot14::ZERO),
+            F2Dot14::wrapping_maddp(self.xy, rhs.yx, self.yy, rhs.yy, F2Dot14::ZERO),
         )
     }
-    /// Multiplies this [`Affine2x2`] by another, saturating at [`F2DOT14`]'s bounds.
+    /// Multiplies this [`Affine2x2`] by another, saturating at [`F2Dot14`]'s bounds.
     pub const fn saturating_mul(&self, rhs: Self) -> Self {
         Self::new(
-            F2DOT14::saturating_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2DOT14::ZERO),
-            F2DOT14::saturating_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2DOT14::ZERO),
-            F2DOT14::saturating_maddp(self.xy, rhs.xx, self.yy, rhs.xy, F2DOT14::ZERO),
-            F2DOT14::saturating_maddp(self.xy, rhs.yx, self.yy, rhs.yy, F2DOT14::ZERO),
+            F2Dot14::saturating_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2Dot14::ZERO),
+            F2Dot14::saturating_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2Dot14::ZERO),
+            F2Dot14::saturating_maddp(self.xy, rhs.xx, self.yy, rhs.xy, F2Dot14::ZERO),
+            F2Dot14::saturating_maddp(self.xy, rhs.yx, self.yy, rhs.yy, F2Dot14::ZERO),
         )
     }
     /// Multiplies this [`Affine2x2`] by another, returning `None` if overflow occurs.
     pub const fn checked_mul(&self, rhs: Self) -> Option<Self> {
         Some(Self::new(
-            F2DOT14::checked_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2DOT14::ZERO)?,
-            F2DOT14::checked_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2DOT14::ZERO)?,
-            F2DOT14::checked_maddp(self.xy, rhs.xx, self.yy, rhs.xy, F2DOT14::ZERO)?,
-            F2DOT14::checked_maddp(self.xy, rhs.yx, self.yy, rhs.yy, F2DOT14::ZERO)?,
+            F2Dot14::checked_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2Dot14::ZERO)?,
+            F2Dot14::checked_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2Dot14::ZERO)?,
+            F2Dot14::checked_maddp(self.xy, rhs.xx, self.yy, rhs.xy, F2Dot14::ZERO)?,
+            F2Dot14::checked_maddp(self.xy, rhs.yx, self.yy, rhs.yy, F2Dot14::ZERO)?,
         ))
     }
 
@@ -185,10 +185,10 @@ impl Affine2x2 {
     pub const fn from_be_bytes(bytes: [u8; 8]) -> Self {
         let (&[xx, yx, xy, yy], []) = bytes.as_chunks::<2>() else { panic!() };
         Self::new(
-            F2DOT14::from_be_bytes(xx),
-            F2DOT14::from_be_bytes(yx),
-            F2DOT14::from_be_bytes(xy),
-            F2DOT14::from_be_bytes(yy),
+            F2Dot14::from_be_bytes(xx),
+            F2Dot14::from_be_bytes(yx),
+            F2Dot14::from_be_bytes(xy),
+            F2Dot14::from_be_bytes(yy),
         )
     }
     /// Returns this [`Affine2x2`] as big-endian bytes.
@@ -203,7 +203,7 @@ impl Affine2x2 {
     }
 
     /// Returns this [`Affine2x2`]'s `(xx, yx, xy, yy)` as a tuple.
-    pub const fn to_tuple(&self) -> (F2DOT14, F2DOT14, F2DOT14, F2DOT14) {
+    pub const fn to_tuple(&self) -> (F2Dot14, F2Dot14, F2Dot14, F2Dot14) {
         (self.xx, self.yx, self.xy, self.yy)
     }
     /// Returns this [`Affine2x2`]'s `(xx, yx, xy, yy)` as a tuple of [`f32`]s.
@@ -212,11 +212,11 @@ impl Affine2x2 {
     }
 
     /// Creates an [`Affine2x2`] from a `[xx, yx, xy, yy]` array.
-    pub const fn from_array([xx, yx, xy, yy]: [F2DOT14; 4]) -> Self {
+    pub const fn from_array([xx, yx, xy, yy]: [F2Dot14; 4]) -> Self {
         Self { xx, yx, xy, yy }
     }
     /// Returns this [`Affine2x2`]'s `[xx, yx, xy, yy]` as an array.
-    pub const fn to_array(self) -> [F2DOT14; 4] {
+    pub const fn to_array(self) -> [F2Dot14; 4] {
         [self.xx, self.yx, self.xy, self.yy]
     }
 }

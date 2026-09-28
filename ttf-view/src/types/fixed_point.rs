@@ -337,7 +337,7 @@ impl_fixed_point_number! {
     PRECISION = 4;
 }
 impl_fixed_point_number! {
-    pub struct F2DOT14(i16 as [u8; 2]; 2|14 as f32, i32);
+    pub struct F2Dot14(i16 as [u8; 2]; 2|14 as f32, i32);
     DENOM = 16384;
     STEP = 0.000061035156;
     MIN = -2.0;
@@ -364,14 +364,14 @@ mod tests {
         // Ensure the upper boundary is correctly rounded down
         assert_eq!(Fixed::new(32767.999999999996).unwrap().to_be_bytes(), [0x7F, 0xFF, 0xFF, 0xFF]);
         assert_eq!(Fixed::new(32768.0), None);
-        assert_eq!(F2DOT14::new(1.9999999).unwrap().to_be_bytes(), [0x7F, 0xFF]);
-        assert_eq!(F2DOT14::new(2.0), None);
+        assert_eq!(F2Dot14::new(1.9999999).unwrap().to_be_bytes(), [0x7F, 0xFF]);
+        assert_eq!(F2Dot14::new(2.0), None);
 
         // Ensure the lower boundary is at an integer
         assert_eq!(Fixed::new(-32768.0).unwrap().to_be_bytes(), [0x80, 0x00, 0x00, 0x00]);
         assert_eq!(Fixed::new(-32768.00000000001), None);
-        assert_eq!(F2DOT14::new(-2.0).unwrap().to_be_bytes(), [0x80, 0x00]);
-        assert_eq!(F2DOT14::new(-2.0000002), None);
+        assert_eq!(F2Dot14::new(-2.0).unwrap().to_be_bytes(), [0x80, 0x00]);
+        assert_eq!(F2Dot14::new(-2.0000002), None);
     }
 
     #[test]
@@ -410,9 +410,9 @@ mod tests {
     #[test]
     fn f2dot14() {
         // Check f32 bounds used in parameter validation
-        assert_eq!(F2DOT14::F_MIN, -2.0);
-        assert_eq!(F2DOT14::F_MAX_EXCLUSIVE, 2.0);
-        assert_eq!(F2DOT14::F_MAX, 1.999939);
+        assert_eq!(F2Dot14::F_MIN, -2.0);
+        assert_eq!(F2Dot14::F_MAX_EXCLUSIVE, 2.0);
+        assert_eq!(F2Dot14::F_MAX, 1.999939);
 
         // Test a bunch of sample numbers
         let nums: [(u16, f32); _] = [
@@ -429,12 +429,12 @@ mod tests {
         ];
 
         for (raw, fp) in nums {
-            let real = F2DOT14::new(fp).unwrap().0 as u16;
+            let real = F2Dot14::new(fp).unwrap().0 as u16;
             assert_eq!(real, raw, "{real:#X} != {raw:#X} ({fp})");
 
-            let real = F2DOT14::new(fp).unwrap().get();
+            let real = F2Dot14::new(fp).unwrap().get();
             let diff = (real - fp).abs();
-            assert!(diff <= 0.1 * F2DOT14::F_STEP, "{real} != {fp} (Δ={diff})");
+            assert!(diff <= 0.1 * F2Dot14::F_STEP, "{real} != {fp} (Δ={diff})");
         }
     }
 }

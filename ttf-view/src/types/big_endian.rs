@@ -1,5 +1,5 @@
 use crate::types::{
-    Affine2x2, F2DOT14, Fixed, LongDateTime, Version16Dot16, int16, int32, int64, u24, uint16,
+    Affine2x2, F2Dot14, Fixed, LongDateTime, Version16Dot16, int16, int32, int64, u24, uint16,
     uint32, uint64,
 };
 
@@ -38,7 +38,7 @@ impl_primitives! {
     u64, uint64, |x| x.get(), |x| uint64::new(x);
 
     Fixed, [u8; 4], |x| Fixed::from_be_bytes(x), |x| x.to_be_bytes();
-    F2DOT14, [u8; 2], |x| F2DOT14::from_be_bytes(x), |x| x.to_be_bytes();
+    F2Dot14, [u8; 2], |x| F2Dot14::from_be_bytes(x), |x| x.to_be_bytes();
     LongDateTime, [u8; 8], |x| LongDateTime::from_be_bytes(x), |x| x.to_be_bytes();
     u24, [u8; 3], |x| u24::from_be_bytes(x), |x| x.to_be_bytes();
     Version16Dot16, [u8; 4], |x| unsafe { Version16Dot16::from_be_bytes_unchecked(x) },

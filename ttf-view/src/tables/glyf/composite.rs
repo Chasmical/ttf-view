@@ -1,6 +1,6 @@
 use crate::{
     tables::glyf::Glyph,
-    types::{Affine2x2, BigEndian, F2DOT14, int16, uint16},
+    types::{Affine2x2, BigEndian, F2Dot14, int16, uint16},
 };
 
 #[repr(C)]
@@ -27,15 +27,15 @@ pub struct Component {
     // :     uint16 arg1and2; /* (arg1 << 8) | arg2 */
     // : }
     // : if ( flags & WE_HAVE_A_SCALE ) {
-    // :     F2DOT14  scale;
+    // :     F2Dot14  scale;
     // : } else if ( flags & WE_HAVE_AN_X_AND_Y_SCALE ) {
-    // :     F2DOT14  xscale;
-    // :     F2DOT14  yscale;
+    // :     F2Dot14  xscale;
+    // :     F2Dot14  yscale;
     // : } else if ( flags & WE_HAVE_A_TWO_BY_TWO ) {
-    // :     F2DOT14  xscale;
-    // :     F2DOT14  scale01;
-    // :     F2DOT14  scale10;
-    // :     F2DOT14  yscale;
+    // :     F2Dot14  xscale;
+    // :     F2Dot14  scale01;
+    // :     F2Dot14  scale10;
+    // :     F2Dot14  yscale;
     // : }
 }
 
@@ -55,10 +55,10 @@ impl Component {
 
         Some(unsafe {
             if self.flags.intersects(ComponentFlags::WE_HAVE_A_SCALE) {
-                let scale = (&*ptr.cast::<BigEndian<F2DOT14>>()).get();
+                let scale = (&*ptr.cast::<BigEndian<F2Dot14>>()).get();
                 Affine2x2::scale(scale)
             } else if self.flags.intersects(ComponentFlags::WE_HAVE_AN_X_AND_Y_SCALE) {
-                let [x, y] = *ptr.cast::<[BigEndian<F2DOT14>; 2]>();
+                let [x, y] = *ptr.cast::<[BigEndian<F2Dot14>; 2]>();
                 Affine2x2::scale_xy(x.get(), y.get())
             } else if self.flags.intersects(ComponentFlags::WE_HAVE_A_TWO_BY_TWO) {
                 (&*ptr.cast::<BigEndian<Affine2x2>>()).get()
