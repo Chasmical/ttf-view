@@ -68,14 +68,20 @@ impl Affine2x2 {
     }
 
     /// Creates an [`Affine2x2`] with
-    /// <span class="hidden">`[cos(θ),-sin(θ); sin(θ),cos(θ)]`</span>
+    /// <span class="hidden">`[cos(θ),-sin(θ);sin(θ),cos(θ)]`</span>
     /// <math><mo>[</mo><mtable>
     ///   <mtr><mtd><mi>cos(θ)</mi></mtd><mtd><mi>-sin(θ)</mi></mtd></mtr>
     ///   <mtr><mtd><mi>sin(θ)</mi></mtd><mtd><mi>cos(θ)</mi></mtd></mtr>
     /// </mtable><mo>]</mo></math>,
     /// rotating the image counter-clockwise by specified angle.
-    pub fn rotate_degrees(degrees: f32) -> Self {
-        Self::rotate_radians(degrees.to_radians())
+    pub fn rotation(radians: f32) -> Self {
+        let (sin, cos) = radians.sin_cos();
+        Self::new(
+            F2DOT14::new(cos).unwrap(),
+            F2DOT14::new(-sin).unwrap(),
+            F2DOT14::new(sin).unwrap(),
+            F2DOT14::new(cos).unwrap(),
+        )
     }
     /// Creates an [`Affine2x2`] with
     /// <span class="hidden">`[cos(θ),-sin(θ); sin(θ),cos(θ)]`</span>
@@ -84,13 +90,8 @@ impl Affine2x2 {
     ///   <mtr><mtd><mi>sin(θ)</mi></mtd><mtd><mi>cos(θ)</mi></mtd></mtr>
     /// </mtable><mo>]</mo></math>,
     /// rotating the image counter-clockwise by specified angle.
-    pub fn rotate_radians(radians: f32) -> Self {
-        Self::new(
-            F2DOT14::new(radians.cos()).unwrap(),
-            F2DOT14::new(-radians.sin()).unwrap(),
-            F2DOT14::new(radians.sin()).unwrap(),
-            F2DOT14::new(radians.cos()).unwrap(),
-        )
+    pub fn rotation_degrees(degrees: f32) -> Self {
+        Self::rotation(degrees.to_radians())
     }
 
     /// Applies this [`Affine2x2`] transformation to the point
@@ -119,7 +120,7 @@ impl Affine2x2 {
     /// assert_eq!(Affine2x2::IDENTITY.transform_f32(10.0, -10.0), (10.0, -10.0));
     /// assert_eq!(Affine2x2::IDENTITY.transform_f32(-2583.2, 1842.2), (-2583.2, 1842.2));
     ///
-    /// let rot90 = Affine2x2::rotate_degrees(90.0);
+    /// let rot90 = Affine2x2::rotation_degrees(90.0);
     /// assert_eq!(rot90.transform_f32(23.5, 9.8), (9.8, -23.5));
     /// ```
     pub const fn transform_f32(&self, x: f32, y: f32) -> (f32, f32) {
@@ -136,7 +137,7 @@ impl Affine2x2 {
     /// assert_eq!(Affine2x2::IDENTITY.transform_i16(100, -100), (100, -100));
     /// assert_eq!(Affine2x2::IDENTITY.transform_i16(-25832, 18422), (-25832, 18422));
     ///
-    /// let rot90 = Affine2x2::rotate_degrees(90.0);
+    /// let rot90 = Affine2x2::rotation_degrees(90.0);
     /// assert_eq!(rot90.transform_i16(235, 98), (98, -235));
     /// ```
     pub const fn transform_i16(&self, x: i16, y: i16) -> (i16, i16) {
@@ -228,6 +229,7 @@ const impl std::ops::Mul for Affine2x2 {
 
 impl std::fmt::Debug for Affine2x2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "[{:?}, {:?}; {:?}, {:?}]", self.xx, self.yx, self.xy, self.yy)
+        let Self { xx, yx, xy, yy } = *self;
+        write!(f, "[{:?}, {:?}; {:?}, {:?}]", xx, yx, xy, yy)
     }
 }
