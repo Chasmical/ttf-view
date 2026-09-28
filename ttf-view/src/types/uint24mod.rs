@@ -123,6 +123,9 @@ impl u24 {
         self.0
     }
 
+    pub const fn wrapping_neg(self) -> Self {
+        Self(self.0.wrapping_neg() & Self::MAX.0)
+    }
     pub const fn wrapping_add(self, rhs: Self) -> Self {
         Self(self.0.wrapping_add(rhs.0) & Self::MAX.0)
     }
@@ -136,7 +139,13 @@ impl u24 {
     ///
     /// This function will panic if `rhs == 0`.
     pub const fn wrapping_div(self, rhs: Self) -> Self {
-        Self(self.0.wrapping_div(rhs.0) & Self::MAX.0)
+        Self(self.0.wrapping_div(rhs.0))
+    }
+    /// # Panics
+    ///
+    /// This function will panic if `rhs == 0`.
+    pub const fn wrapping_rem(self, rhs: Self) -> Self {
+        Self(self.0.wrapping_rem(rhs.0))
     }
 
     pub const fn saturating_add(self, rhs: Self) -> Self {
@@ -155,6 +164,9 @@ impl u24 {
         Self(self.0.saturating_div(rhs.0))
     }
 
+    pub const fn checked_neg(self) -> Option<Self> {
+        self.0.checked_neg().map(Self)
+    }
     pub const fn checked_add(self, rhs: Self) -> Option<Self> {
         self.0.wrapping_add(rhs.0).try_into().ok()
     }
@@ -166,6 +178,9 @@ impl u24 {
     }
     pub const fn checked_div(self, rhs: Self) -> Option<Self> {
         self.0.checked_div(rhs.0).map(Self)
+    }
+    pub const fn checked_rem(self, rhs: Self) -> Option<Self> {
+        self.0.checked_rem(rhs.0).map(Self)
     }
 }
 
@@ -199,7 +214,7 @@ const impl std::ops::Mul for u24 {
         return self.wrapping_mul(rhs);
     }
 }
-/// Performs division `/` (panics on overflow in debug configuration).
+/// Performs division `/`.
 ///
 /// # Panics
 ///
@@ -208,9 +223,26 @@ const impl std::ops::Div for u24 {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
         #[cfg(debug_assertions)]
-        return self.checked_div(rhs).expect("attempt to divide with overflow");
+        return self.checked_div(rhs).expect("attempt to divide by zero");
         #[cfg(not(debug_assertions))]
         return self.wrapping_div(rhs);
+    }
+}
+/// Performs remainder operation `%`.
+///
+/// # Panics
+///
+/// This operation will panic if `rhs == 0`.
+const impl std::ops::Rem for u24 {
+    type Output = Self;
+    fn rem(self, rhs: Self) -> Self::Output {
+        #[cfg(debug_assertions)]
+        return self
+            .checked_rem(rhs)
+            .expect("attempt to calculate the remainder with a divisor of zero");
+
+        #[cfg(not(debug_assertions))]
+        return self.wrapping_rem(rhs);
     }
 }
 

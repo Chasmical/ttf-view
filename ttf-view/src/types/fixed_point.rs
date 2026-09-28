@@ -173,6 +173,9 @@ macro_rules! impl_fixed_point_number {
                 self.0.widening_mul(rhs.0)
             }
 
+            pub const fn wrapping_neg(self) -> Self {
+                Self(self.0.wrapping_neg())
+            }
             pub const fn wrapping_add(self, rhs: Self) -> Self {
                 Self(self.0.wrapping_add(rhs.0))
             }
@@ -188,7 +191,16 @@ macro_rules! impl_fixed_point_number {
             pub const fn wrapping_div(self, rhs: Self) -> Self {
                 Self((self.wmul(Self::ONE) / rhs.0 as $wide) as $int)
             }
+            /// # Panics
+            ///
+            /// This function panics if `rhs == 0`.
+            pub const fn wrapping_rem(self, rhs: Self) -> Self {
+                Self(self.0.wrapping_rem(rhs.0))
+            }
 
+            pub const fn saturating_neg(self) -> Self {
+                Self(self.0.saturating_neg())
+            }
             pub const fn saturating_add(self, rhs: Self) -> Self {
                 Self(self.0.saturating_add(rhs.0))
             }
@@ -205,6 +217,9 @@ macro_rules! impl_fixed_point_number {
                 Self((self.wmul(Self::ONE) / rhs.0 as $wide).saturating_cast())
             }
 
+            pub const fn checked_neg(self) -> Option<Self> {
+                self.0.checked_neg().map(Self)
+            }
             pub const fn checked_add(self, rhs: Self) -> Option<Self> {
                 self.0.checked_add(rhs.0).map(Self)
             }
@@ -216,6 +231,9 @@ macro_rules! impl_fixed_point_number {
             }
             pub const fn checked_div(self, rhs: Self) -> Option<Self> {
                 (self.wmul(Self::ONE).checked_div(rhs.0 as $wide)?).checked_cast().map(Self)
+            }
+            pub const fn checked_rem(self, rhs: Self) -> Option<Self> {
+                self.0.checked_rem(rhs.0).map(Self)
             }
 
             /// Wrapping product sum operation (ab+cd+p)
@@ -235,6 +253,16 @@ macro_rules! impl_fixed_point_number {
             }
         }
 
+        /// Performs negation `-` (panics on overflow in debug configuration).
+        const impl std::ops::Neg for $Name {
+            type Output = Self;
+            fn neg(self) -> Self::Output {
+                #[cfg(debug_assertions)]
+                { self.checked_neg().expect("attempt to negate with overflow") }
+                #[cfg(not(debug_assertions))]
+                { self.wrapping_neg() }
+            }
+        }
         /// Performs addition `+` (panics on overflow in debug configuration).
         const impl std::ops::Add for $Name {
             type Output = Self;
@@ -274,9 +302,23 @@ macro_rules! impl_fixed_point_number {
             type Output = Self;
             fn div(self, rhs: Self) -> Self::Output {
                 #[cfg(debug_assertions)]
-                { self.checked_div(rhs).expect("attempt to divide with overflow") }
+                { self.checked_div(rhs).expect("attempt to divide by zero or with overflow") }
                 #[cfg(not(debug_assertions))]
                 { self.wrapping_div(rhs) }
+            }
+        }
+        /// Performs remainder operation `%` (panics on overflow in debug configuration).
+        ///
+        /// # Panics
+        ///
+        /// This operation will panic if `rhs == 0`.
+        const impl std::ops::Rem for $Name {
+            type Output = Self;
+            fn rem(self, rhs: Self) -> Self::Output {
+                #[cfg(debug_assertions)]
+                { self.checked_rem(rhs).expect("attempt to calculate the remainder with a divisor of zero or with overflow") }
+                #[cfg(not(debug_assertions))]
+                { self.wrapping_rem(rhs) }
             }
         }
 
