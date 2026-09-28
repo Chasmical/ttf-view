@@ -22,6 +22,7 @@ pub type Offset24 = uint24;
 pub type Offset32 = uint32;
 
 mod affine2x2;
+mod affine2x3;
 mod fixed_point;
 mod longdatetime;
 mod tag;
@@ -29,6 +30,7 @@ mod uint24mod;
 mod version16dot16;
 
 pub use affine2x2::*;
+pub use affine2x3::*;
 pub use fixed_point::*;
 pub use longdatetime::*;
 pub use tag::*;
