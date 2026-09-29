@@ -159,15 +159,17 @@ impl std::fmt::Debug for TableDirectory {
             .field("search_range", &self.search_range.get())
             .field("entry_selector", &self.entry_selector.get())
             .field("range_shift", &self.range_shift.get())
-            .field("table_records", fmt_with! { |f| {
-                let mut list = f.debug_list();
-
-                for table in self.table_records() {
-                    list.entry(fmt_with!("{:?}", table));
-                }
-                list.finish()
-            } })
+            .field("table_records", &self.table_records())
             .finish()
+    }
+}
+impl<'a> std::fmt::Debug for TableRecordsIter<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut list = f.debug_list();
+        for table in self.as_records() {
+            list.entry(fmt_with!("{:?}", table));
+        }
+        list.finish()
     }
 }
 impl std::fmt::Debug for TableRecordRaw {

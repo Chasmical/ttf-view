@@ -258,13 +258,11 @@ impl std::fmt::Debug for Name<'_> {
         f.field("version", &self.version.get())
             .field("count", &self.count.get())
             .field("storage_offset", fmt_with!("{:#06X}", self.storage_offset))
-            .field("name_records", fmt_with!(|f| f.debug_list().entries(self.names()).finish()));
+            .field("name_records", &self.names());
 
         if let Some(v1) = self.v1() {
             f.field("lang_tag_count", &v1.lang_tag_records().len());
-            f.field("lang_tag_records", fmt_with! {
-                |f| f.debug_list().entries(self.lang_tags()).finish()
-            });
+            f.field("lang_tag_records", &self.lang_tags());
         }
 
         f.finish()
@@ -283,12 +281,25 @@ impl std::fmt::Debug for NameV1 {
     }
 }
 
+impl<'a> std::fmt::Debug for NameRecordsIter<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_list().entries(self.clone()).finish()
+    }
+}
+impl<'a> std::fmt::Debug for LangTagRecordsIter<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_list().entries(self.clone()).finish()
+    }
+}
+
 impl std::fmt::Debug for NameRecord<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let Self(name, rec) = *self;
 
+        // TODO: perhaps a string_or_bytes() method?
         let value = self.string().map_err(|err| (err, ByteStr::new(self.bytes())));
 
+        // TODO: all of this stuff needs to be moved to {Platform,Encoding,Language}Id enums
         let plat_id = PlatformId::new(rec.platform_id.get());
         let plat_name = plat_id.map_or("Unknown", |x| x.name());
 
@@ -322,7 +333,7 @@ impl std::fmt::Debug for LangTagRecord<'_> {
         f.debug_struct("LangTagRecord")
             .field("length", &rec.length.get())
             .field("lang_tag_offset", fmt_with!("{:#06X}", rec.lang_tag_offset))
-            .field("value", fmt_with!("{:?}", self.string()))
+            .field("value", &self.string())
             .finish()
     }
 }
