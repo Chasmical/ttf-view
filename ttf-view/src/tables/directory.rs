@@ -164,9 +164,7 @@ impl std::fmt::Debug for TableDirectory {
                 let mut list = f.debug_list();
 
                 for table in self.table_records() {
-                    list.entry_with(|f| {
-                        table.fmt(&mut f.with_options(*f.options().alternate(false)))
-                    });
+                    list.entry_with(|f| write!(f, "{:?}", table));
                 }
                 list.finish()
             })

@@ -109,7 +109,6 @@
 #![feature(derive_const)]
 #![feature(bstr)]
 #![feature(debug_closure_helpers)]
-#![feature(formatting_options)]
 #![feature(slice_from_ptr_range)]
 #![feature(iter_advance_by)]
 #![feature(exact_size_is_empty)]

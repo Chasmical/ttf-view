@@ -308,10 +308,7 @@ impl std::fmt::Debug for NameRecord<'_> {
             .field("name_id", &rec.name_id.get())
             .field("length", &rec.length.get())
             .field_with("string_offset", |f| write!(f, "{:#06X}", rec.string_offset))
-            .field_with("value", |f| {
-                let mut f = f.with_options(*f.options().alternate(false));
-                value.fmt(&mut f)
-            })
+            .field_with("value", |f| write!(f, "{:?}", value))
             .finish()
     }
 }
@@ -323,10 +320,7 @@ impl std::fmt::Debug for LangTagRecord<'_> {
         f.debug_struct("LangTagRecord")
             .field("length", &rec.length.get())
             .field_with("lang_tag_offset", |f| write!(f, "{:#06X}", rec.lang_tag_offset))
-            .field_with("value", |f| {
-                let mut f = f.with_options(*f.options().alternate(false));
-                self.string().fmt(&mut f)
-            })
+            .field_with("value", |f| write!(f, "{:?}", self.string()))
             .finish()
     }
 }
