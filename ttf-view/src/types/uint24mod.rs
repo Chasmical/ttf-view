@@ -173,7 +173,8 @@ impl u24 {
         Self(self.0.saturating_sub(rhs.0))
     }
     pub const fn saturating_mul(self, rhs: Self) -> Self {
-        Self(self.0.widening_mul(rhs.0).min(Self::MAX.0 as u64) as u32)
+        // TODO: When widening_mul is stabilized, use it here.
+        Self((self.0 as u64 * rhs.0 as u64).min(Self::MAX.0 as u64) as u32)
     }
     /// # Panics
     ///
@@ -192,7 +193,8 @@ impl u24 {
         self.0.checked_sub(rhs.0).map(Self)
     }
     pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
-        self.0.widening_mul(rhs.0).try_into().ok()
+        // TODO: When widening_mul is stabilized, use it here.
+        (self.0 as u64 * rhs.0 as u64).try_into().ok()
     }
     pub const fn checked_div(self, rhs: Self) -> Option<Self> {
         self.0.checked_div(rhs.0).map(Self)

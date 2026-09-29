@@ -1,4 +1,4 @@
-use crate::util::impl_fmt_with;
+use crate::util::{impl_fmt_with, saturating_cast};
 
 macro_rules! impl_fixed_point_number {
     (
@@ -171,7 +171,8 @@ macro_rules! impl_fixed_point_number {
             /// Don't forget to divide the wide numerator by [`DENOM`][Self::DENOM] before casting
             /// it back to [`Self`] with [`from_frac_num`][Self::from_frac_num].
             pub(crate) const fn wmul(self, rhs: Self) -> $wide {
-                self.0.widening_mul(rhs.0)
+                // TODO: When widening_mul is stabilized, use it here.
+                self.0 as $wide * rhs.0 as $wide
             }
 
             pub const fn wrapping_neg(self) -> Self {
@@ -209,13 +210,15 @@ macro_rules! impl_fixed_point_number {
                 Self(self.0.saturating_sub(rhs.0))
             }
             pub const fn saturating_mul(self, rhs: Self) -> Self {
-                Self((self.wmul(rhs) / $denom).saturating_cast())
+                // TODO: When saturating_cast is stabilized, use it here.
+                Self(saturating_cast!((self.wmul(rhs) / $denom) => $int))
             }
             /// # Panics
             ///
             /// This function panics if `rhs == 0`.
             pub const fn saturating_div(self, rhs: Self) -> Self {
-                Self((self.wmul(Self::ONE) / rhs.0 as $wide).saturating_cast())
+                // TODO: When saturating_cast is stabilized, use it here.
+                Self(saturating_cast!((self.wmul(Self::ONE) / rhs.0 as $wide) => $int))
             }
 
             pub const fn checked_neg(self) -> Option<Self> {
@@ -228,10 +231,12 @@ macro_rules! impl_fixed_point_number {
                 self.0.checked_sub(rhs.0).map(Self)
             }
             pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
-                (self.wmul(rhs) / $denom).checked_cast().map(Self)
+                // TODO: When checked_cast is stabilized, use it here instead of try_into().ok().
+                (self.wmul(rhs) / $denom).try_into().ok().map(Self)
             }
             pub const fn checked_div(self, rhs: Self) -> Option<Self> {
-                (self.wmul(Self::ONE).checked_div(rhs.0 as $wide)?).checked_cast().map(Self)
+                // TODO: When checked_cast is stabilized, use it here instead of try_into().ok().
+                (self.wmul(Self::ONE).checked_div(rhs.0 as $wide)?).try_into().ok().map(Self)
             }
             pub const fn checked_rem(self, rhs: Self) -> Option<Self> {
                 self.0.checked_rem(rhs.0).map(Self)
@@ -245,7 +250,8 @@ macro_rules! impl_fixed_point_number {
             /// Saturating product sum operation (ab+cd+p)
             pub(crate) const fn saturating_maddp(a: Self, b: Self, c: Self, d: Self, p: Self) -> Self {
                 let sum = a.wmul(b).saturating_add(c.wmul(d)) / $denom;
-                Self(sum.saturating_add(p.0 as $wide).saturating_cast())
+                // TODO: When saturating_cast is stabilized, use it here.
+                Self(saturating_cast!((sum.saturating_add(p.0 as $wide)) => $int))
             }
             /// Checked product sum operation (ab+cd+p)
             pub(crate) const fn checked_maddp(a: Self, b: Self, c: Self, d: Self, p: Self) -> Option<Self> {

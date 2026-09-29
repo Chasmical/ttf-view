@@ -21,3 +21,17 @@ macro_rules! impl_fmt_with {
     )*);
 }
 pub(crate) use impl_fmt_with;
+
+// TODO: When saturating_cast is stabilized, replace all usages of this with it.
+macro_rules! saturating_cast {
+    (($value:expr) => $ty:ty) => {{
+        let value = $value;
+        if let Ok(cast) = value.try_into() {
+            cast
+        } else {
+            if value < 0 { <$ty>::MIN } else { <$ty>::MAX }
+        }
+    }};
+}
+
+pub(crate) use saturating_cast;
