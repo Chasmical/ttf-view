@@ -11,7 +11,6 @@ macro_rules! impl_fixed_point_number {
         STEP = $step:literal;
         MIN = $min:literal;
         MAX = $max:literal;
-        PRECISION = $precision:literal;
     ) => {
         #[doc = concat!("The [OpenType ", stringify!($Name), "][spec] type, a ")]
         #[doc = concat!(stringify!($integer_bits), ".", stringify!($fraction_bits), "-bit")]
@@ -33,7 +32,6 @@ macro_rules! impl_fixed_point_number {
             const F_STEP: $fp = 1.0 / (1 << $fraction_bits) as $fp;
             const F_MIN: $fp = -(1 << ($integer_bits - 1)) as $fp;
             const F_MAX_EXCLUSIVE: $fp = (1 << ($integer_bits - 1)) as $fp;
-            const F_MAX: $fp = Self::F_MAX_EXCLUSIVE - Self::F_STEP;
 
             #[doc = concat!("The difference between adjacent [`", stringify!($Name), "`] values.")]
             ///
@@ -82,16 +80,6 @@ macro_rules! impl_fixed_point_number {
             #[doc = concat!("assert_eq!(", stringify!($Name), "::ONE, 1.0);")]
             /// ```
             pub const ONE: Self = Self::new(1.0).unwrap();
-
-            /// The amount of decimal places the type can accurately represent.
-            ///
-            /// # Examples
-            ///
-            /// ```
-            #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::PRECISION, ", stringify!($precision), ");")]
-            /// ```
-            pub const PRECISION: u32 = (Self::F_STEP.recip() as u32).ilog10();
 
             /// This type's integer fraction's denominator.
             ///
@@ -177,11 +165,6 @@ macro_rules! impl_fixed_point_number {
             #[doc = concat!("Returns this [`", stringify!($Name), "`]'s value as [`", stringify!($fp), "`].")]
             pub const fn get(self) -> $fp {
                 self.frac_num() as $fp * Self::F_STEP
-            }
-            #[doc = concat!("Rounds this [`", stringify!($Name), "`]'s value to [`PRECISION`][Self::PRECISION] decimal places.")]
-            pub const fn round_to_precision(self) -> $fp {
-                const SCALE: $fp = 10u32.pow($Name::PRECISION) as $fp;
-                (self.get() * SCALE).round() / SCALE
             }
 
             /// Widening numerator multiplication: x/d * y/d = xy/dd.
@@ -395,7 +378,6 @@ impl_fixed_point_number! {
     STEP = 0.0000152587890625;
     MIN = -32768.0;
     MAX = 32767.99998474121;
-    PRECISION = 4;
 }
 impl_fixed_point_number! {
     pub struct F2Dot14(i16 as [u8; 2]; 2|14 as f32, i32);
@@ -403,7 +385,6 @@ impl_fixed_point_number! {
     STEP = 0.000061035156;
     MIN = -2.0;
     MAX = 1.999939;
-    PRECISION = 4;
 }
 
 #[cfg(test)]
@@ -411,36 +392,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn precision() {
-        // Precision tests for Fixed (font_revision)
-        let f = Fixed::from_be_bytes(0x0001999A_u32.to_be_bytes());
-        assert_eq!(format!("{}", f), "1.600006103515625");
-        assert_eq!(format!("{}", f.round_to_precision()), "1.6");
-
-        assert_eq!(format!("{:.0}", f), "2");
-        assert_eq!(format!("{:.1}", f), "1.6");
-        assert_eq!(format!("{:.3}", f), "1.600");
-        assert_eq!(format!("{:.7}", f), "1.6000061");
-
-        // Ensure the upper boundary is correctly rounded down
-        assert_eq!(Fixed::new(32767.999999999996).unwrap().to_be_bytes(), [0x7F, 0xFF, 0xFF, 0xFF]);
-        assert_eq!(Fixed::new(32768.0), None);
-        assert_eq!(F2Dot14::new(1.9999999).unwrap().to_be_bytes(), [0x7F, 0xFF]);
-        assert_eq!(F2Dot14::new(2.0), None);
-
-        // Ensure the lower boundary is at an integer
-        assert_eq!(Fixed::new(-32768.0).unwrap().to_be_bytes(), [0x80, 0x00, 0x00, 0x00]);
-        assert_eq!(Fixed::new(-32768.00000000001), None);
-        assert_eq!(F2Dot14::new(-2.0).unwrap().to_be_bytes(), [0x80, 0x00]);
-        assert_eq!(F2Dot14::new(-2.0000002), None);
-    }
-
-    #[test]
     fn fixed() {
-        // Check f64 bounds used in parameter validation
-        assert_eq!(Fixed::F_MIN, -32768.0);
-        assert_eq!(Fixed::F_MAX_EXCLUSIVE, 32768.0);
-        assert_eq!(Fixed::F_MAX, 32767.99998474121);
+        // Check the rounding at boundaries
+        assert_eq!(Fixed::new(32767.999999999996), Some(Fixed::MAX));
+        assert_eq!(Fixed::new(32768.0), None);
+        assert_eq!(Fixed::new(-32768.0), Some(Fixed::MIN));
+        assert_eq!(Fixed::new(-32768.00000000001), None);
 
         // Test a bunch of sample numbers
         let nums: [(u32, f64); _] = [
@@ -459,21 +416,21 @@ mod tests {
         ];
 
         for (raw, fp) in nums {
-            let real = Fixed::new(fp).unwrap().0 as u32;
-            assert_eq!(real, raw, "{real:#X} != {raw:#X} ({fp})");
+            let real = Fixed::new(fp).unwrap();
+            assert_eq!(real.0 as u32, raw, "{real:#X} != {raw:#X} ({fp})");
 
-            let real = Fixed::new(fp).unwrap().get();
-            let diff = (real - fp).abs();
+            let diff = (real.get() - fp).abs();
             assert!(diff <= 0.1 * Fixed::F_STEP, "{real} != {fp} (Δ={diff})");
         }
     }
 
     #[test]
     fn f2dot14() {
-        // Check f32 bounds used in parameter validation
-        assert_eq!(F2Dot14::F_MIN, -2.0);
-        assert_eq!(F2Dot14::F_MAX_EXCLUSIVE, 2.0);
-        assert_eq!(F2Dot14::F_MAX, 1.999939);
+        // Check the rounding at boundaries
+        assert_eq!(F2Dot14::new(1.9999999), Some(F2Dot14::MAX));
+        assert_eq!(F2Dot14::new(2.0), None);
+        assert_eq!(F2Dot14::new(-2.0), Some(F2Dot14::MIN));
+        assert_eq!(F2Dot14::new(-2.0000002), None);
 
         // Test a bunch of sample numbers
         let nums: [(u16, f32); _] = [
@@ -490,11 +447,10 @@ mod tests {
         ];
 
         for (raw, fp) in nums {
-            let real = F2Dot14::new(fp).unwrap().0 as u16;
-            assert_eq!(real, raw, "{real:#X} != {raw:#X} ({fp})");
+            let real = F2Dot14::new(fp).unwrap();
+            assert_eq!(real.0 as u16, raw, "{real:#X} != {raw:#X} ({fp})");
 
-            let real = F2Dot14::new(fp).unwrap().get();
-            let diff = (real - fp).abs();
+            let diff = (real.get() - fp).abs();
             assert!(diff <= 0.1 * F2Dot14::F_STEP, "{real} != {fp} (Δ={diff})");
         }
     }
