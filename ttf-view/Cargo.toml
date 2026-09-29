@@ -1,5 +1,5 @@
 [package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 name = "ttf-view"
 description = "A TrueType/OpenType font parsing/viewing library and a CLI tool."
