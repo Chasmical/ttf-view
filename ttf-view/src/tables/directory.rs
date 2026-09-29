@@ -52,9 +52,8 @@ impl TableDirectory {
     }
 
     pub const fn directory_as_bytes(&self) -> &[u8] {
-        let start = std::ptr::from_ref(self).cast();
-        let end = self.table_records_raw().as_ptr_range().end.cast();
-        unsafe { std::slice::from_ptr_range(start..end) }
+        let size = size_of::<Self>() + size_of_val(self.table_records_raw());
+        unsafe { std::slice::from_raw_parts(std::ptr::from_ref(self).cast(), size) }
     }
 
     pub const fn table_records_raw(&self) -> &[TableRecordRaw] {

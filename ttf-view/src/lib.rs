@@ -95,7 +95,6 @@
 
 #![feature(const_trait_impl)]
 #![feature(const_result_trait_fn)]
-#![feature(const_slice_from_ptr_range)]
 #![feature(const_slice_make_iter)]
 #![feature(const_option_ops)]
 #![feature(const_convert)]
@@ -109,7 +108,6 @@
 #![feature(derive_const)]
 #![feature(bstr)]
 #![feature(debug_closure_helpers)]
-#![feature(slice_from_ptr_range)]
 #![feature(iter_advance_by)]
 #![feature(exact_size_is_empty)]
 #![feature(try_trait_v2)]
