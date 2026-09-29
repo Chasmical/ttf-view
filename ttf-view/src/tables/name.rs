@@ -2,7 +2,7 @@ use crate::{
     platform::{EncodingError, EncodingId, PlatformId},
     tables::{Table, TableDirectory, TableError},
     types::{Offset16, Tag, tags, uint16},
-    util::custom_iterator,
+    util::{custom_iterator, fmt_with},
 };
 use std::{borrow::Cow, bstr::ByteStr};
 
@@ -257,12 +257,14 @@ impl std::fmt::Debug for Name<'_> {
 
         f.field("version", &self.version.get())
             .field("count", &self.count.get())
-            .field_with("storage_offset", |f| write!(f, "{:#06X}", self.storage_offset))
-            .field_with("name_records", |f| f.debug_list().entries(self.names()).finish());
+            .field("storage_offset", fmt_with!("{:#06X}", self.storage_offset))
+            .field("name_records", fmt_with!(|f| f.debug_list().entries(self.names()).finish()));
 
         if let Some(v1) = self.v1() {
             f.field("lang_tag_count", &v1.lang_tag_records().len());
-            f.field_with("lang_tag_records", |f| f.debug_list().entries(self.lang_tags()).finish());
+            f.field("lang_tag_records", fmt_with! {
+                |f| f.debug_list().entries(self.lang_tags()).finish()
+            });
         }
 
         f.finish()
@@ -301,14 +303,14 @@ impl std::fmt::Debug for NameRecord<'_> {
         );
 
         f.debug_struct("NameRecord")
-            .field_with("platform_id", |f| write!(f, "{} ({})", rec.platform_id, plat_name))
-            .field_with("encoding_id", |f| write!(f, "{} ({})", rec.encoding_id, enc_name))
-            .field_with("language_id", |f| write!(f, "{:#06X} ({})", rec.language_id, lang_name))
+            .field("platform_id", fmt_with!("{} ({})", rec.platform_id, plat_name))
+            .field("encoding_id", fmt_with!("{} ({})", rec.encoding_id, enc_name))
+            .field("language_id", fmt_with!("{:#06X} ({})", rec.language_id, lang_name))
             // TODO: Parse name_id and display its name
             .field("name_id", &rec.name_id.get())
             .field("length", &rec.length.get())
-            .field_with("string_offset", |f| write!(f, "{:#06X}", rec.string_offset))
-            .field_with("value", |f| write!(f, "{:?}", value))
+            .field("string_offset", fmt_with!("{:#06X}", rec.string_offset))
+            .field("value", fmt_with!("{:?}", value))
             .finish()
     }
 }
@@ -319,8 +321,8 @@ impl std::fmt::Debug for LangTagRecord<'_> {
 
         f.debug_struct("LangTagRecord")
             .field("length", &rec.length.get())
-            .field_with("lang_tag_offset", |f| write!(f, "{:#06X}", rec.lang_tag_offset))
-            .field_with("value", |f| write!(f, "{:?}", self.string()))
+            .field("lang_tag_offset", fmt_with!("{:#06X}", rec.lang_tag_offset))
+            .field("value", fmt_with!("{:?}", self.string()))
             .finish()
     }
 }

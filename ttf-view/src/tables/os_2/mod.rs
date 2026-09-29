@@ -2,6 +2,7 @@
 use crate::{
     tables::{Table, TableDirectory, TableError},
     types::{FWORD, Tag, UFWORD, int16, tags, uint16, uint32},
+    util::fmt_with,
 };
 
 mod code_pages;
@@ -243,7 +244,7 @@ impl std::fmt::Debug for Os_2<'_> {
             .field("x_avg_char_width", &self.x_avg_char_width.get())
             .field("us_weight_class", &self.us_weight_class.get())
             .field("us_width_class", &self.us_width_class.get())
-            .field_with("fs_type", |f| write!(f, "{:#010b}", self.fs_type))
+            .field("fs_type", fmt_with!("{:#010b}", self.fs_type))
             // TODO: combine into ScriptMetrics struct (and add getter)
             .field("y_subscript_x_size", &self.y_subscript_x_size.get())
             .field("y_subscript_y_size", &self.y_subscript_y_size.get())

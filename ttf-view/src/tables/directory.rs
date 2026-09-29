@@ -1,7 +1,7 @@
 use crate::{
     tables::{Table, TableError},
     types::{Offset32, Tag, tags, uint16, uint32},
-    util::custom_iterator,
+    util::{custom_iterator, fmt_with},
 };
 
 #[repr(C)]
@@ -154,19 +154,19 @@ custom_iterator!(TableRecordsIter<'a> as this {
 impl std::fmt::Debug for TableDirectory {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("TableDirectory")
-            .field_with("sfnt_version", |f| write!(f, "{:#010X}", self.sfnt_version))
+            .field("sfnt_version", fmt_with!("{:#010X}", self.sfnt_version))
             .field("num_tables", &self.num_tables.get())
             .field("search_range", &self.search_range.get())
             .field("entry_selector", &self.entry_selector.get())
             .field("range_shift", &self.range_shift.get())
-            .field_with("table_records", |f| {
+            .field("table_records", fmt_with! { |f| {
                 let mut list = f.debug_list();
 
                 for table in self.table_records() {
-                    list.entry_with(|f| write!(f, "{:?}", table));
+                    list.entry(fmt_with!("{:?}", table));
                 }
                 list.finish()
-            })
+            } })
             .finish()
     }
 }
@@ -174,9 +174,9 @@ impl std::fmt::Debug for TableRecordRaw {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("TableRecord")
             .field("table_tag", &self.table_tag)
-            .field_with("checksum", |f| write!(f, "{:#010X}", self.checksum))
-            .field_with("offset", |f| write!(f, "{:#010X}", self.offset))
-            .field_with("length", |f| write!(f, "{:#010X}", self.length))
+            .field("checksum", fmt_with!("{:#010X}", self.checksum))
+            .field("offset", fmt_with!("{:#010X}", self.offset))
+            .field("length", fmt_with!("{:#010X}", self.length))
             .finish()
     }
 }

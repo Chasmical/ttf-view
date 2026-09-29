@@ -1,6 +1,7 @@
 use crate::{
     tables::{Table, TableDirectory, TableError},
     types::{BigEndian, Fixed, LongDateTime, Tag, int16, tags, uint16, uint32},
+    util::fmt_with,
 };
 
 #[repr(C)]
@@ -147,17 +148,17 @@ impl std::fmt::Debug for Head<'_> {
 
         if let Some(v1) = self.v1() {
             f.field("font_revision", &v1.font_revision);
-            f.field_with("checksum_adjustment", |f| write!(f, "{:#010X}", v1.checksum_adjustment));
-            f.field_with("magic_number", |f| write!(f, "{:#010X}", v1.magic_number));
-            f.field_with("flags", |f| write!(f, "{:#017b}", v1.flags));
+            f.field("checksum_adjustment", fmt_with!("{:#010X}", v1.checksum_adjustment));
+            f.field("magic_number", fmt_with!("{:#010X}", v1.magic_number));
+            f.field("flags", fmt_with!("{:#017b}", v1.flags));
             f.field("units_per_em", &v1.units_per_em.get());
-            f.field_with("created", |f| write!(f, "{}", v1.created));
-            f.field_with("modified", |f| write!(f, "{}", v1.modified));
+            f.field("created", fmt_with!("{}", v1.created));
+            f.field("modified", fmt_with!("{}", v1.modified));
             f.field("x_min", &v1.x_min.get());
             f.field("y_min", &v1.y_min.get());
             f.field("x_max", &v1.x_max.get());
             f.field("y_max", &v1.y_max.get());
-            f.field_with("mac_style", |f| write!(f, "{:#09b}", v1.mac_style));
+            f.field("mac_style", fmt_with!("{:#09b}", v1.mac_style));
             f.field("lowest_rec_ppem", &v1.lowest_rec_ppem.get());
             f.field("font_direction_hint", &v1.font_direction_hint.get());
             f.field("index_to_loc_format", &v1.index_to_loc_format.get());

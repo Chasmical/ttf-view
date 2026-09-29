@@ -1,7 +1,7 @@
 use crate::{
     tables::{Table, TableDirectory, TableError, cmap::GlyphId},
     types::{Offset16, Offset32, Tag, tags},
-    util::{PackedDualIter, custom_iterator},
+    util::{PackedDualIter, custom_iterator, fmt_with},
 };
 use std::{num::NonZero, ops::Range, ptr::NonNull};
 
@@ -204,12 +204,10 @@ impl std::fmt::Debug for Loca<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut f = f.debug_struct("loca");
 
-        f.field_with("index_to_loc_format", |f| {
-            write!(f, "{} ({:?})", self.format as i16, self.format)
-        });
+        f.field("index_to_loc_format", fmt_with!("{} ({:?})", self.format as i16, self.format));
         f.field("num_glyphs", &self.num_glyphs());
 
-        f.field_with("offsets", |f| {
+        f.field("offsets", fmt_with! { |f| {
             write!(f, "{{")?;
 
             let id_width = self.num_glyphs.checked_ilog10().unwrap_or(0) as usize + 1;
@@ -228,7 +226,7 @@ impl std::fmt::Debug for Loca<'_> {
             }
 
             write!(f, "\n}}")
-        });
+        } });
 
         f.finish()
     }

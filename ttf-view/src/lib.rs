@@ -107,7 +107,6 @@
 #![feature(const_try)]
 #![feature(derive_const)]
 #![feature(bstr)]
-#![feature(debug_closure_helpers)]
 #![feature(iter_advance_by)]
 #![feature(exact_size_is_empty)]
 #![feature(try_trait_v2)]

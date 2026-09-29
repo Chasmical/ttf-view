@@ -33,5 +33,29 @@ macro_rules! saturating_cast {
         }
     }};
 }
-
 pub(crate) use saturating_cast;
+
+// TODO: When Debug {field,entry}_with are stabilized, replace all usages of this with them.
+// Although, maybe not all usages... this macro is pretty convenient, it's 9 chars shorter.
+macro_rules! fmt_with {
+    (|$f:ident| $closure:expr) => {
+        &$crate::util::DebugOnce::new(|$f| $closure)
+    };
+    ($format:literal, $($tt:tt)*) => {
+        fmt_with!(|f| write!(f, $format, $($tt)*))
+    };
+}
+pub(crate) struct DebugOnce<F>(std::cell::Cell<Option<F>>);
+
+impl<F: FnOnce(&mut std::fmt::Formatter) -> std::fmt::Result> DebugOnce<F> {
+    pub fn new(f: F) -> Self {
+        Self(std::cell::Cell::new(Some(f)))
+    }
+}
+impl<F: FnOnce(&mut std::fmt::Formatter) -> std::fmt::Result> std::fmt::Debug for DebugOnce<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.0.take().unwrap()(f)
+    }
+}
+
+pub(crate) use fmt_with;
