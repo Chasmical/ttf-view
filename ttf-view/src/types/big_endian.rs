@@ -1,5 +1,6 @@
 use crate::{
     platform::PlatformId,
+    tables::name::NameId,
     types::{
         Affine2x2, F2Dot14, Fixed, LongDateTime, Version16Dot16, int16, int32, int64, u24, uint16,
         uint32, uint64,
@@ -49,6 +50,7 @@ impl_big_endian! {
     Affine2x2, [u8; 8], |x| Affine2x2::from_be_bytes(x), |x| x.to_be_bytes();
 
     PlatformId, uint16, |x| PlatformId::new(x.get()), |x| uint16::new(x.get());
+    NameId, uint16, |x| NameId::new(x.get()), |x| uint16::new(x.get());
 }
 
 #[derive(Copy)]

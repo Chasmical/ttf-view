@@ -1,4 +1,4 @@
-use crate::platform::{PlatformId, define_u16_ids};
+use crate::{platform::PlatformId, types::define_u16_ids};
 use std::borrow::Cow;
 
 #[cfg(feature = "non-standard-encodings")]

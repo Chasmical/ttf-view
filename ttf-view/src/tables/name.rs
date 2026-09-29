@@ -1,7 +1,7 @@
 use crate::{
     platform::{EncodingError, EncodingId, PlatformId},
     tables::{Table, TableDirectory, TableError},
-    types::{BigEndian, Offset16, Tag, tags, uint16},
+    types::{BigEndian, Offset16, Tag, define_u16_ids, tags, uint16},
     util::{custom_iterator, fmt_with},
 };
 use std::bstr::ByteStr;
@@ -34,7 +34,7 @@ pub struct NameRecordRaw {
     pub platform_id: BigEndian<PlatformId>,
     pub encoding_id: uint16,
     pub language_id: uint16,
-    pub name_id: uint16,
+    pub name_id: BigEndian<NameId>,
     pub length: uint16,
     pub string_offset: Offset16,
 }
@@ -42,6 +42,37 @@ pub struct NameRecordRaw {
 pub struct LangTagRecordRaw {
     pub length: uint16,
     pub lang_tag_offset: Offset16,
+}
+
+define_u16_ids! {
+    pub struct NameId: u16 {
+        CopyrightNotice = 0,
+        FamilyName = 1,
+        SubfamilyName = 2,
+        UniqueIdentifier = 3,
+        FullName = 4,
+        VersionString = 5,
+        PostScriptName = 6,
+        Trademark = 7,
+        Manufacturer = 8,
+        Designer = 9,
+        Description = 10,
+        VendorUrl = 11,
+        DesignerUrl = 12,
+        LicenseDescription = 13,
+        LicenseUrl = 14,
+        // Reserved = 15,
+        TypographicFamilyName = 16,
+        TypographicSubfamilyName = 17,
+        CompatibleFullName = 18,
+        SampleText = 19,
+        PostScriptCidName = 20,
+        WwsFamilyName = 21,
+        WwsSubfamilyName = 22,
+        LightBackgroundPalette = 23,
+        DarkBackgroundPalette = 24,
+        VariationsPostScriptNamePrefix = 25,
+    }
 }
 
 impl<'a> Table<'a> for Name<'a> {
@@ -311,7 +342,6 @@ impl std::fmt::Debug for NameRecord<'_> {
             .field("platform_id", &platform)
             .field("encoding_id", &encoding)
             .field("language_id", &language.display(Some(name)))
-            // TODO: Parse name_id and display its name
             .field("name_id", &rec.name_id.get())
             .field("length", &rec.length.get())
             .field("string_offset", fmt_with!("{:#06X}", rec.string_offset))
