@@ -64,21 +64,39 @@ impl u24 {
     /// assert_eq!(u24::new(3_999_000_000), None);
     /// ```
     pub const fn new(num: u32) -> Option<Self> {
-        if num <= Self::MAX.0 { Some(unsafe { Self::new_unchecked(num) }) } else { None }
+        if num <= Self::MAX.0 { Some(Self(num)) } else { None }
     }
-    /// Creates a [`u24`] from [`u32`] without checks.
+    /// Creates a [`u24`] from [`u32`], saturating at the numeric bounds.
     ///
     /// # Examples
     ///
     /// ```
     /// use ttf_view::types::u24;
     ///
-    /// assert_eq!(unsafe { u24::new_unchecked(1234).get() }, 1234);
-    /// assert_eq!(unsafe { u24::new_unchecked(15_000_000).get() }, 15_000_000);
+    /// assert_eq!(u24::new_saturating(1234), 1234);
+    /// assert_eq!(u24::new_saturating(15_000_000), 15_000_000);
+    /// assert_eq!(u24::new_saturating(0xFFFFFF), 0xFFFFFF);
+    /// assert_eq!(u24::new_saturating(17_000_000), 0xFFFFFF);
+    /// assert_eq!(u24::new_saturating(3_999_000_000), 0xFFFFFF);
     /// ```
-    pub const unsafe fn new_unchecked(num: u32) -> Self {
-        debug_assert!(num <= Self::MAX.0);
-        Self(num)
+    pub const fn new_saturating(num: u32) -> Self {
+        Self(num.min(Self::MAX.0))
+    }
+    /// Creates a [`u24`] from [`u32`], truncating the most significant 8 bits.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ttf_view::types::u24;
+    ///
+    /// assert_eq!(u24::new_truncating(1234), 1234);
+    /// assert_eq!(u24::new_truncating(15_000_000), 15_000_000);
+    /// assert_eq!(u24::new_truncating(0xFFFFFF), 0xFFFFFF);
+    /// assert_eq!(u24::new_truncating(17_000_000), 222784);
+    /// assert_eq!(u24::new_truncating(3_999_000_000), 6022592);
+    /// ```
+    pub const fn new_truncating(num: u32) -> Self {
+        Self(num & Self::MAX.0)
     }
 
     /// Creates a [`u24`] from big-endian bytes.

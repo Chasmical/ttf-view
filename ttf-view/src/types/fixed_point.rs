@@ -103,7 +103,8 @@ macro_rules! impl_fixed_point_number {
             /// ```
             pub const DENOM: $int = Self::ONE.0;
 
-            #[doc = concat!("Creates a [`", stringify!($Name), "`] from [`", stringify!($fp), "`].")]
+            #[doc = concat!("Creates a [`", stringify!($Name), "`] from [`", stringify!($fp), "`],")]
+            #[doc = concat!("returning `None` if the value is out of `", stringify!($Name), "`'s range.")]
             ///
             /// # Examples
             ///
@@ -112,7 +113,9 @@ macro_rules! impl_fixed_point_number {
             ///
             #[doc = concat!("assert_eq!(", stringify!($Name), "::new(-0.125).unwrap(), -0.125);")]
             #[doc = concat!("assert_eq!(", stringify!($Name), "::new(1.99609375).unwrap(), 1.99609375);")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::new(123456.78), None);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new(-34000.0), None);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new(34000.0), None);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new(", stringify!($fp), "::NAN), None);")]
             ///
             #[doc = concat!("// numbers are rounded towards the closest value representable by ", stringify!($Name))]
             #[doc = concat!("assert_eq!(", stringify!($Name), "::new(0.5156247).unwrap(), 0.515625);")]
@@ -121,17 +124,33 @@ macro_rules! impl_fixed_point_number {
             /// ```
             pub const fn new(num: $fp) -> Option<Self> {
                 if matches!(num, Self::F_MIN..Self::F_MAX_EXCLUSIVE) {
-                    Some(unsafe { Self::new_unchecked(num) })
+                    Some(Self::new_saturating(num))
                 } else {
                     None
                 }
             }
-            #[doc = concat!("Creates a [`", stringify!($Name), "`] from [`", stringify!($fp), "`] without checks.")]
-            pub const unsafe fn new_unchecked(num: $fp) -> Self {
-                debug_assert!(matches!(num, Self::F_MIN..Self::F_MAX_EXCLUSIVE));
-
+            #[doc = concat!("Creates a [`", stringify!($Name), "`] from [`", stringify!($fp), "`],")]
+            /// saturating at the numeric bounds, and mapping NaN to 0.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            #[doc = concat!("use ttf_view::types::", stringify!($Name), ";")]
+            ///
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new_saturating(-0.125), -0.125);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new_saturating(1.99609375), 1.99609375);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new_saturating(-34000.0), ", $min, ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new_saturating(34000.0), ", $max, ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new_saturating(", stringify!($fp), "::NAN), 0.0);")]
+            ///
+            #[doc = concat!("// numbers are rounded towards the closest value representable by ", stringify!($Name))]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new_saturating(0.5156247), 0.515625);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new_saturating(0.5156250), 0.515625);")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::new_saturating(0.5156254), 0.515625);")]
+            /// ```
+            pub const fn new_saturating(num: $fp) -> Self {
                 // Note: No need to worry about 1.9999999 wrapping to -2, because `as` here
-                // converts in a saturating way (even Infinity becomes 0xFFFF through `as`).
+                // converts in a saturating way (even Infinity becomes 0x7FFF through `as`).
                 Self((num / Self::F_STEP).round() as $int)
             }
 
