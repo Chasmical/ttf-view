@@ -41,7 +41,7 @@ macro_rules! impl_fixed_point_number {
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
             #[doc = concat!("assert_eq!(", stringify!($Name), "::STEP, ", stringify!($step), ");")]
             /// ```
-            pub const STEP: Self = Self::new(Self::F_STEP).unwrap();
+            pub const STEP: Self = Self(1);
 
             /// The smallest value that can be represented by this type.
             ///
@@ -51,7 +51,7 @@ macro_rules! impl_fixed_point_number {
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
             #[doc = concat!("assert_eq!(", stringify!($Name), "::MIN, ", stringify!($min), ");")]
             /// ```
-            pub const MIN: Self = Self::new(Self::F_MIN).unwrap();
+            pub const MIN: Self = Self(<$int>::MIN);
             /// The largest value that can be represented by this type.
             ///
             /// # Examples
@@ -60,7 +60,7 @@ macro_rules! impl_fixed_point_number {
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
             #[doc = concat!("assert_eq!(", stringify!($Name), "::MAX, ", stringify!($max), ");")]
             /// ```
-            pub const MAX: Self = Self::new(Self::F_MAX).unwrap();
+            pub const MAX: Self = Self(<$int>::MAX);
 
             /// The value zero.
             ///
