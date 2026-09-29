@@ -161,7 +161,7 @@ impl LongDateTime {
     /// let dt: DateTime<Utc> = "2014-03-28 11:54:06 UTC".parse().unwrap();
     /// assert_eq!(LongDateTime::new(dt).epoch_seconds(), 3478852446);
     /// ```
-    pub const fn epoch_seconds(&self) -> i64 {
+    pub const fn epoch_seconds(self) -> i64 {
         self.0
     }
 

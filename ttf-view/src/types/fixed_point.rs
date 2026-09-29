@@ -170,16 +170,16 @@ macro_rules! impl_fixed_point_number {
             }
             #[doc = concat!("Returns this [`", stringify!($Name), "`]'s integer fraction's numerator")]
             #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", stringify!($denom), "`</span><math><mfrac><mi>numerator</mi><mn>", stringify!($denom), "</mn></mfrac></math>).")]
-            pub const fn frac_num(&self) -> $int {
+            pub const fn frac_num(self) -> $int {
                 self.0
             }
 
             #[doc = concat!("Returns this [`", stringify!($Name), "`]'s value as [`", stringify!($fp), "`].")]
-            pub const fn get(&self) -> $fp {
+            pub const fn get(self) -> $fp {
                 self.frac_num() as $fp * Self::F_STEP
             }
             #[doc = concat!("Rounds this [`", stringify!($Name), "`]'s value to [`PRECISION`][Self::PRECISION] decimal places.")]
-            pub const fn round_to_precision(&self) -> $fp {
+            pub const fn round_to_precision(self) -> $fp {
                 const SCALE: $fp = 10u32.pow($Name::PRECISION) as $fp;
                 (self.get() * SCALE).round() / SCALE
             }

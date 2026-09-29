@@ -154,7 +154,7 @@ impl Affine2x2 {
     // [C D]   [c d]   [Ca+Dc Cb+Dd]   [xy*xx+yy*xy xy*yx+yy*yy]
 
     /// Multiplies this [`Affine2x2`] by another, wrapping and truncating at [`F2Dot14`]'s bounds.
-    pub const fn wrapping_mul(&self, rhs: Self) -> Self {
+    pub const fn wrapping_mul(self, rhs: Self) -> Self {
         Self::new(
             F2Dot14::wrapping_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2Dot14::ZERO),
             F2Dot14::wrapping_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2Dot14::ZERO),
@@ -163,7 +163,7 @@ impl Affine2x2 {
         )
     }
     /// Multiplies this [`Affine2x2`] by another, saturating at [`F2Dot14`]'s bounds.
-    pub const fn saturating_mul(&self, rhs: Self) -> Self {
+    pub const fn saturating_mul(self, rhs: Self) -> Self {
         Self::new(
             F2Dot14::saturating_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2Dot14::ZERO),
             F2Dot14::saturating_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2Dot14::ZERO),
@@ -172,7 +172,7 @@ impl Affine2x2 {
         )
     }
     /// Multiplies this [`Affine2x2`] by another, returning `None` if overflow occurs.
-    pub const fn checked_mul(&self, rhs: Self) -> Option<Self> {
+    pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
         Some(Self::new(
             F2Dot14::checked_maddp(self.xx, rhs.xx, self.yx, rhs.xy, F2Dot14::ZERO)?,
             F2Dot14::checked_maddp(self.xx, rhs.yx, self.yx, rhs.yy, F2Dot14::ZERO)?,
@@ -203,11 +203,11 @@ impl Affine2x2 {
     }
 
     /// Returns this [`Affine2x2`]'s `(xx, yx, xy, yy)` as a tuple.
-    pub const fn to_tuple(&self) -> (F2Dot14, F2Dot14, F2Dot14, F2Dot14) {
+    pub const fn to_tuple(self) -> (F2Dot14, F2Dot14, F2Dot14, F2Dot14) {
         (self.xx, self.yx, self.xy, self.yy)
     }
     /// Returns this [`Affine2x2`]'s `(xx, yx, xy, yy)` as a tuple of [`f32`]s.
-    pub const fn to_tuple_f32(&self) -> (f32, f32, f32, f32) {
+    pub const fn to_tuple_f32(self) -> (f32, f32, f32, f32) {
         (self.xx.get(), self.yx.get(), self.xy.get(), self.yy.get())
     }
 

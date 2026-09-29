@@ -137,7 +137,7 @@ impl u24 {
     /// assert_eq!(u24::new(1234).unwrap(), 1234);
     /// assert_eq!(u24::new(15_000_000).unwrap(), 15_000_000);
     /// ```
-    pub const fn get(&self) -> u32 {
+    pub const fn get(self) -> u32 {
         self.0
     }
 

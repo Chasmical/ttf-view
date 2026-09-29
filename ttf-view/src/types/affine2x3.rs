@@ -237,11 +237,11 @@ impl Affine2x3 {
     }
 
     /// Returns this [`Affine2x3`]'s `(xx, yx, xy, yy, dx, dy)` as a tuple.
-    pub const fn to_tuple(&self) -> (Fixed, Fixed, Fixed, Fixed, Fixed, Fixed) {
+    pub const fn to_tuple(self) -> (Fixed, Fixed, Fixed, Fixed, Fixed, Fixed) {
         (self.xx, self.yx, self.xy, self.yy, self.dx, self.dy)
     }
     /// Returns this [`Affine2x3`]'s `(xx, yx, xy, yy, dx, dy)` as a tuple of [`f64`]s.
-    pub const fn to_tuple_f64(&self) -> (f64, f64, f64, f64, f64, f64) {
+    pub const fn to_tuple_f64(self) -> (f64, f64, f64, f64, f64, f64) {
         (self.xx.get(), self.yx.get(), self.xy.get(), self.yy.get(), self.dx.get(), self.dy.get())
     }
 

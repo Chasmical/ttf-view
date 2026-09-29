@@ -56,7 +56,7 @@ impl<T: Primitive> BigEndian<T> {
     where T: [const] Primitive {
         Self(T::to_big_endian(value))
     }
-    pub const fn get(&self) -> T
+    pub const fn get(self) -> T
     where T: [const] Primitive {
         T::from_big_endian(self.0)
     }
