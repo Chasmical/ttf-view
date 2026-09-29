@@ -12,9 +12,8 @@ macro_rules! impl_fixed_point_number {
         MIN = $min:literal;
         MAX = $max:literal;
     ) => {
-        #[doc = concat!("The [OpenType ", stringify!($Name), "][spec] type, a ")]
-        #[doc = concat!(stringify!($integer_bits), ".", stringify!($fraction_bits), "-bit")]
-        /// signed fixed-point type.
+        #[doc = concat!("The [OpenType ", stringify!($Name), "][spec] type, a")]
+        #[doc = concat!($integer_bits, ".", $fraction_bits, "-bit signed fixed-point type.")]
         ///
         /// [spec]: https://learn.microsoft.com/en-us/typography/opentype/spec/otff#data-types
         $(#[$outer])*
@@ -39,7 +38,7 @@ macro_rules! impl_fixed_point_number {
             ///
             /// ```
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::STEP, ", stringify!($step), ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::STEP, ", $step, ");")]
             /// ```
             pub const STEP: Self = Self(1);
 
@@ -49,7 +48,7 @@ macro_rules! impl_fixed_point_number {
             ///
             /// ```
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::MIN, ", stringify!($min), ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::MIN, ", $min, ");")]
             /// ```
             pub const MIN: Self = Self(<$int>::MIN);
             /// The largest value that can be represented by this type.
@@ -58,7 +57,7 @@ macro_rules! impl_fixed_point_number {
             ///
             /// ```
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::MAX, ", stringify!($max), ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::MAX, ", $max, ");")]
             /// ```
             pub const MAX: Self = Self(<$int>::MAX);
 
@@ -87,7 +86,7 @@ macro_rules! impl_fixed_point_number {
             ///
             /// ```
             #[doc = concat!("# use ttf_view::types::", stringify!($Name), ";")]
-            #[doc = concat!("assert_eq!(", stringify!($Name), "::DENOM, ", stringify!($denom), ");")]
+            #[doc = concat!("assert_eq!(", stringify!($Name), "::DENOM, ", $denom, ");")]
             /// ```
             pub const DENOM: $int = Self::ONE.0;
 
@@ -152,12 +151,12 @@ macro_rules! impl_fixed_point_number {
             }
 
             #[doc = concat!("Creates a [`", stringify!($Name), "`] from its integer fraction's numerator")]
-            #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", stringify!($denom), "`</span><math><mfrac><mi>numerator</mi><mn>", stringify!($denom), "</mn></mfrac></math>).")]
+            #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", $denom, "`</span><math><mfrac><mi>numerator</mi><mn>", $denom, "</mn></mfrac></math>).")]
             pub const fn from_frac_num(numerator: $int) -> Self {
                 Self(numerator)
             }
             #[doc = concat!("Returns this [`", stringify!($Name), "`]'s integer fraction's numerator")]
-            #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", stringify!($denom), "`</span><math><mfrac><mi>numerator</mi><mn>", stringify!($denom), "</mn></mfrac></math>).")]
+            #[doc = concat!("(`", stringify!($Name), "` represented as <span class=\"hidden\">`numerator/", $denom, "`</span><math><mfrac><mi>numerator</mi><mn>", $denom, "</mn></mfrac></math>).")]
             pub const fn frac_num(self) -> $int {
                 self.0
             }
