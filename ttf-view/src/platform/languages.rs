@@ -2,122 +2,111 @@ use crate::{platform::PlatformId, tables::name::Name};
 use lcid::{LanguageId as Lcid, LcidLookupError};
 use std::borrow::Cow;
 
-#[derive(Debug, Copy, Hash)]
-#[derive_const(Clone, PartialEq, Eq)]
-#[repr(u16)]
-pub enum LanguageId {
-    Tagged(u16) = 0,
-    Macintosh(u16) = 1,
-    Windows(u16) = 3,
+#[derive(Copy, Hash)]
+#[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LanguageId {
+    platform: PlatformId,
+    language: u16,
 }
 
 impl LanguageId {
-    pub const fn new(platform_id: u16, language_id: u16) -> Option<Self> {
-        PlatformId::new(platform_id)?.language(language_id)
+    pub const fn new(platform: PlatformId, language: u16) -> Self {
+        Self { platform, language }
+    }
+    pub const fn platform(&self) -> PlatformId {
+        self.platform
+    }
+    pub const fn get(&self) -> u16 {
+        self.language
     }
 
-    pub const fn platform_id(&self) -> Option<u16> {
-        match self {
-            Self::Tagged(_) => None,
-            Self::Macintosh(_) => Some(1),
-            Self::Windows(_) => Some(3),
+    pub fn ietf_tag(&self, table: Option<Name<'_>>) -> Option<Cow<'static, str>> {
+        if let Some(idx) = self.language.checked_sub(0x8000) {
+            return Some(Cow::Owned(table?.lang_tags().nth(idx as usize)?.string()));
         }
-    }
-    pub const fn language_id(&self) -> u16 {
-        match *self {
-            Self::Tagged(x) => x,
-            Self::Macintosh(x) => x,
-            Self::Windows(x) => x,
-        }
-    }
-
-    pub fn tag(&self, table: Option<Name<'_>>) -> Option<Cow<'static, str>> {
-        Some(match *self {
-            Self::Tagged(id) => {
-                Cow::Owned(table?.lang_tags().nth((id & 0x7FFF) as usize)?.string())
+        Some(Cow::Borrowed(match self.platform {
+            PlatformId::Macintosh => macintosh_lang_id_to_tag(self.language)?,
+            PlatformId::Windows => match <&Lcid>::try_from(self.language as u32) {
+                Ok(lcid) => lcid.name,
+                Err(LcidLookupError::Reserved(_, tag)) => tag,
+                _ => return None,
             },
-            Self::Macintosh(id) => Cow::Borrowed(macintosh_language_tag(id)?),
-
-            Self::Windows(id) => match <&Lcid>::try_from(id as u32) {
-                Ok(lcid) => Cow::Borrowed(lcid.name),
-                Err(LcidLookupError::Reserved(_, tag)) => Cow::Borrowed(tag),
-                Err(_) => return None,
-            },
-        })
+            _ => return None,
+        }))
     }
-
     pub fn english_name(&self, table: Option<Name<'_>>) -> Option<Cow<'static, str>> {
-        Some(match *self {
-            Self::Tagged(id) => {
-                let lang_tag = table?.lang_tags().nth((id & 0x7FFF) as usize)?.string();
-                let lcid: &Lcid = lang_tag.as_str().try_into().ok()?;
-                Cow::Borrowed(lcid.english_name)
-            },
-            Self::Macintosh(id) => Cow::Borrowed(macintosh_language_name(id)?),
+        if let Some(idx) = self.language.checked_sub(0x8000) {
+            let tag = table?.lang_tags().nth(idx as usize)?.string();
+            let lcid: &Lcid = tag.as_str().try_into().ok()?;
+            return Some(Cow::Borrowed(lcid.english_name));
+        }
+        Some(Cow::Borrowed(match self.platform {
+            PlatformId::Macintosh => macintosh_lang_id_to_name(self.language)?,
+            PlatformId::Windows => <&Lcid>::try_from(self.language as u32).ok()?.english_name,
+            _ => return None,
+        }))
+    }
 
-            Self::Windows(id) => {
-                let lcid: &Lcid = (id as u32).try_into().ok()?;
-                Cow::Borrowed(lcid.english_name)
-            },
-        })
+    pub const fn display(self, table: Option<Name<'_>>) -> LanguageDisplay<'_> {
+        LanguageDisplay(self, table)
     }
 }
 
-#[rustfmt::skip]
-fn macintosh_language_tag(id: u16) -> Option<&'static str> {
-    Some(match id {
-        0 => "en", 1 => "fr", 2 => "de", 3 => "it", 4 => "nl", 5 => "sv", 6 => "es", 7 => "da",
-        8 => "pt", 9 => "no", 10 => "he", 11 => "ja", 12 => "ar", 13 => "fi", 14 => "el",
-        15 => "is", 16 => "mt", 17 => "tr", 18 => "hr", 19 => "zh-Hant", 20 => "ur", 21 => "hi",
-        22 => "th", 23 => "ko", 24 => "lt", 25 => "pl", 26 => "hu", 27 => "et", 28 => "lv",
-        29 => "se", 30 => "fo", 31 => "fa", 32 => "ru", 33 => "zh-Hans", 34 => "nl", 35 => "ga",
-        36 => "sq", 37 => "ro", 38 => "cs", 39 => "sk", 40 => "sl", 41 => "yi", 42 => "sr",
-        43 => "mk", 44 => "bg", 45 => "uk", 46 => "be", 47 => "uz", 48 => "kk", 49 => "az-Cyrl",
-        50 => "az-Arab", 51 => "hy", 52 => "ka", 53 => "ro", 54 => "ky", 55 => "tg", 56 => "tk",
-        57 => "mn-Mong", 58 => "mn-Cyrl", 59 => "ps", 60 => "ku", 61 => "ks", 62 => "sd",
-        63 => "bo", 64 => "ne", 65 => "sa", 66 => "mr", 67 => "bn", 68 => "as", 69 => "gu",
-        70 => "pa", 71 => "or", 72 => "ml", 73 => "kn", 74 => "ta", 75 => "te", 76 => "si",
-        77 => "my", 78 => "km", 79 => "lo", 80 => "vi", 81 => "id", 82 => "tl", 83 => "ms-Latn",
-        84 => "ms-Arab", 85 => "am", 86 => "ti", 87 => "om", 88 => "so", 89 => "sw", 90 => "rw",
-        91 => "rn", 92 => "ny", 93 => "mg", 94 => "eo", 128 => "cy", 129 => "eu", 130 => "ca",
-        131 => "la", 132 => "qu", 133 => "gn", 134 => "ay", 135 => "tt", 136 => "ug", 137 => "dz",
-        138 => "jv-Latn", 139 => "su-Latn", 140 => "gl", 141 => "af", 142 => "br", 143 => "iu",
-        144 => "gd", 145 => "gv", 146 => "ga", 147 => "to", 148 => "el", 149 => "kl",
-        150 => "az-Latn",
-        _ => return None,
-    })
+#[derive(Copy)]
+#[derive_const(Clone)]
+pub struct LanguageDisplay<'a>(LanguageId, Option<Name<'a>>);
+
+impl std::fmt::Debug for LanguageDisplay<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let tag = self.0.ietf_tag(self.1).unwrap_or(Cow::Borrowed("und"));
+        let name = self.0.english_name(self.1).unwrap_or(Cow::Borrowed("Unknown"));
+        write!(f, "{:#06X} ({}: {})", self.0.get(), tag, name)
+    }
 }
-#[rustfmt::skip]
-fn macintosh_language_name(id: u16) -> Option<&'static str> {
-    Some(match id {
-        0 => "English", 1 => "French", 2 => "German", 3 => "Italian", 4 => "Dutch", 5 => "Swedish",
-        6 => "Spanish", 7 => "Danish", 8 => "Portuguese", 9 => "Norwegian", 10 => "Hebrew",
-        11 => "Japanese", 12 => "Arabic", 13 => "Finnish", 14 => "Greek", 15 => "Icelandic",
-        16 => "Maltese", 17 => "Turkish", 18 => "Croatian", 19 => "Chinese (traditional)",
-        20 => "Urdu", 21 => "Hindi", 22 => "Thai", 23 => "Korean", 24 => "Lithuanian",
-        25 => "Polish", 26 => "Hungarian", 27 => "Estonian", 28 => "Latvian", 29 => "Sami",
-        30 => "Faroese", 31 => "Farsi/Persian", 32 => "Russian", 33 => "Chinese (simplified)",
-        34 => "Flemish", 35 => "Irish Gaelic", 36 => "Albanian", 37 => "Romanian", 38 => "Czech",
-        39 => "Slovak", 40 => "Slovenian", 41 => "Yiddish", 42 => "Serbian", 43 => "Macedonian",
-        44 => "Bulgarian", 45 => "Ukrainian", 46 => "Byelorussian", 47 => "Uzbek", 48 => "Kazakh",
-        49 => "Azerbaijani (Cyrillic script)", 50 => "Azerbaijani (Arabic script)",
-        51 => "Armenian", 52 => "Georgian", 53 => "Moldavian", 54 => "Kirghiz", 55 => "Tajiki",
-        56 => "Turkmen", 57 => "Mongolian (Mongolian script)", 58 => "Mongolian (Cyrillic script)",
-        59 => "Pashto", 60 => "Kurdish", 61 => "Kashmiri", 62 => "Sindhi", 63 => "Tibetan",
-        64 => "Nepali", 65 => "Sanskrit", 66 => "Marathi", 67 => "Bengali", 68 => "Assamese",
-        69 => "Gujarati", 70 => "Punjabi", 71 => "Oriya", 72 => "Malayalam", 73 => "Kannada",
-        74 => "Tamil", 75 => "Telugu", 76 => "Sinhalese", 77 => "Burmese", 78 => "Khmer",
-        79 => "Lao", 80 => "Vietnamese", 81 => "Indonesian", 82 => "Tagalog",
-        83 => "Malay (Roman script)", 84 => "Malay (Arabic script)", 85 => "Amharic",
-        86 => "Tigrinya", 87 => "Galla", 88 => "Somali", 89 => "Swahili",
-        90 => "Kinyarwanda/Ruanda", 91 => "Rundi", 92 => "Nyanja/Chewa", 93 => "Malagasy",
-        94 => "Esperanto", 128 => "Welsh", 129 => "Basque", 130 => "Catalan", 131 => "Latin",
-        132 => "Quechua", 133 => "Guarani", 134 => "Aymara", 135 => "Tatar", 136 => "Uighur",
-        137 => "Dzongkha", 138 => "Javanese (Roman script)", 139 => "Sundanese (Roman script)",
-        140 => "Galician", 141 => "Afrikaans", 142 => "Breton", 143 => "Inuktitut",
-        144 => "Scottish Gaelic", 145 => "Manx Gaelic", 146 => "Irish Gaelic (with dot above)",
-        147 => "Tongan", 148 => "Greek (polytonic)", 149 => "Greenlandic",
-        150 => "Azerbaijani (Roman script)",
-        _ => return None,
-    })
+
+macro_rules! define_macintosh_languages {
+    ($( $value:literal, $tag:literal, $name:literal; )*) => {
+        fn macintosh_lang_id_to_tag(id: u16) -> Option<&'static str> {
+            Some(match id { $( $value => $tag, )* _ => return None })
+        }
+        fn macintosh_lang_id_to_name(id: u16) -> Option<&'static str> {
+            Some(match id { $( $value => $name, )* _ => return None })
+        }
+    };
+}
+define_macintosh_languages! {
+    0, "en", "English"; 1, "fr", "French"; 2, "de", "German"; 3, "it", "Italian"; 4, "nl", "Dutch";
+    5, "sv", "Swedish"; 6, "es", "Spanish"; 7, "da", "Danish"; 8, "pt", "Portuguese";
+    9, "no", "Norwegian"; 10, "he", "Hebrew"; 11, "ja", "Japanese"; 12, "ar", "Arabic";
+    13, "fi", "Finnish"; 14, "el", "Greek"; 15, "is", "Icelandic"; 16, "mt", "Maltese";
+    17, "tr", "Turkish"; 18, "hr", "Croatian"; 19, "zh-Hant", "Chinese (traditional)";
+    20, "ur", "Urdu"; 21, "hi", "Hindi"; 22, "th", "Thai"; 23, "ko", "Korean";
+    24, "lt", "Lithuanian"; 25, "pl", "Polish"; 26, "hu", "Hungarian"; 27, "et", "Estonian";
+    28, "lv", "Latvian"; 29, "se", "Sami"; 30, "fo", "Faroese"; 31, "fa", "Farsi/Persian";
+    32, "ru", "Russian"; 33, "zh-Hans", "Chinese (simplified)"; 34, "nl", "Flemish";
+    35, "ga", "Irish Gaelic"; 36, "sq", "Albanian"; 37, "ro", "Romanian"; 38, "cs", "Czech";
+    39, "sk", "Slovak"; 40, "sl", "Slovenian"; 41, "yi", "Yiddish"; 42, "sr", "Serbian";
+    43, "mk", "Macedonian"; 44, "bg", "Bulgarian"; 45, "uk", "Ukrainian"; 46, "be", "Byelorussian";
+    47, "uz", "Uzbek"; 48, "kk", "Kazakh"; 49, "az-Cyrl", "Azerbaijani (Cyrillic script)";
+    50, "az-Arab", "Azerbaijani (Arabic script)"; 51, "hy", "Armenian"; 52, "ka", "Georgian";
+    53, "ro", "Moldavian"; 54, "ky", "Kirghiz"; 55, "tg", "Tajiki"; 56, "tk", "Turkmen";
+    57, "mn-Mong", "Mongolian (Mongolian script)"; 58, "mn-Cyrl", "Mongolian (Cyrillic script)";
+    59, "ps", "Pashto"; 60, "ku", "Kurdish"; 61, "ks", "Kashmiri"; 62, "sd", "Sindhi";
+    63, "bo", "Tibetan"; 64, "ne", "Nepali"; 65, "sa", "Sanskrit"; 66, "mr", "Marathi";
+    67, "bn", "Bengali"; 68, "as", "Assamese"; 69, "gu", "Gujarati"; 70, "pa", "Punjabi";
+    71, "or", "Oriya"; 72, "ml", "Malayalam"; 73, "kn", "Kannada"; 74, "ta", "Tamil";
+    75, "te", "Telugu"; 76, "si", "Sinhalese"; 77, "my", "Burmese"; 78, "km", "Khmer";
+    79, "lo", "Lao"; 80, "vi", "Vietnamese"; 81, "id", "Indonesian"; 82, "tl", "Tagalog";
+    83, "ms-Latn", "Malay (Roman script)"; 84, "ms-Arab", "Malay (Arabic script)";
+    85, "am", "Amharic"; 86, "ti", "Tigrinya"; 87, "om", "Galla"; 88, "so", "Somali";
+    89, "sw", "Swahili"; 90, "rw", "Kinyarwanda/Ruanda"; 91, "rn", "Rundi";
+    92, "ny", "Nyanja/Chewa"; 93, "mg", "Malagasy"; 94, "eo", "Esperanto"; 128, "cy", "Welsh";
+    129, "eu", "Basque"; 130, "ca", "Catalan"; 131, "la", "Latin"; 132, "qu", "Quechua";
+    133, "gn", "Guarani"; 134, "ay", "Aymara"; 135, "tt", "Tatar"; 136, "ug", "Uighur";
+    137, "dz", "Dzongkha"; 138, "jv-Latn", "Javanese (Roman script)";
+    139, "su-Latn", "Sundanese (Roman script)"; 140, "gl", "Galician"; 141, "af", "Afrikaans";
+    142, "br", "Breton"; 143, "iu", "Inuktitut"; 144, "gd", "Scottish Gaelic";
+    145, "gv", "Manx Gaelic"; 146, "ga", "Irish Gaelic (with dot above)"; 147, "to", "Tongan";
+    148, "el", "Greek (polytonic)"; 149, "kl", "Greenlandic";
+    150, "az-Latn", "Azerbaijani (Roman script)";
 }

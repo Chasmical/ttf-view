@@ -1,9 +1,12 @@
-use crate::types::{
-    Affine2x2, F2Dot14, Fixed, LongDateTime, Version16Dot16, int16, int32, int64, u24, uint16,
-    uint32, uint64,
+use crate::{
+    platform::PlatformId,
+    types::{
+        Affine2x2, F2Dot14, Fixed, LongDateTime, Version16Dot16, int16, int32, int64, u24, uint16,
+        uint32, uint64,
+    },
 };
 
-mod private {
+pub(crate) mod private {
     pub trait Sealed {}
 }
 
@@ -13,7 +16,7 @@ pub const trait Primitive: private::Sealed + Copy {
     fn to_big_endian(ne: Self) -> Self::BigEndian;
 }
 
-macro_rules! impl_primitives {
+macro_rules! impl_big_endian {
     ($( $ne_ty:ty, $be_ty:ty, |$be:ident| $from_be:expr, |$ne:ident| $to_be:expr ; )*) => ($(
         impl private::Sealed for $ne_ty {}
         const impl Primitive for $ne_ty {
@@ -28,7 +31,7 @@ macro_rules! impl_primitives {
         }
     )*);
 }
-impl_primitives! {
+impl_big_endian! {
     // TODO: Maybe we shouldn't be wrapping zerocopy's types here?
     i16, int16, |x| x.get(), |x| int16::new(x);
     i32, int32, |x| x.get(), |x| int32::new(x);
@@ -44,6 +47,8 @@ impl_primitives! {
     Version16Dot16, [u8; 4], |x| unsafe { Version16Dot16::from_be_bytes_unchecked(x) },
     |x| x.to_be_bytes();
     Affine2x2, [u8; 8], |x| Affine2x2::from_be_bytes(x), |x| x.to_be_bytes();
+
+    PlatformId, uint16, |x| PlatformId::new(x.get()), |x| uint16::new(x.get());
 }
 
 #[derive(Copy)]

@@ -1,6 +1,7 @@
 use crate::{
+    platform::PlatformId,
     tables::{Table, TableDirectory, TableError},
-    types::{Offset32, Tag, tags, uint16, uint32},
+    types::{BigEndian, Offset32, Tag, tags, uint16, uint32},
     util::custom_iterator,
 };
 use std::mem::ManuallyDrop;
@@ -32,7 +33,7 @@ pub struct CmapV0 {
 }
 #[repr(C)]
 pub struct EncodingRecordRaw {
-    pub platform_id: uint16,
+    pub platform_id: BigEndian<PlatformId>,
     pub encoding_id: uint16,
     pub subtable_offset: Offset32,
 }
@@ -113,7 +114,7 @@ const impl<'a> std::ops::Deref for EncodingRecord<'a> {
 }
 impl<'a> EncodingRecord<'a> {
     pub const fn subtable(&self) -> &'a CmapSubtable {
-        let offset = self.1.subtable_offset.get() as _;
+        let offset = self.subtable_offset.get() as _;
         unsafe { &*std::ptr::from_ref(self.0).cast::<u8>().byte_add(offset).cast() }
     }
 }

@@ -1,3 +1,4 @@
 {
-  "rust-analyzer.cargo.features": ["cli"]
+  // "rust-analyzer.cargo.noDefaultFeatures": true,
+  "rust-analyzer.cargo.features": ["cli"],
 }

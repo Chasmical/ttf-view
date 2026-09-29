@@ -7,70 +7,61 @@ pub use languages::*;
 macro_rules! define_u16_ids {
     ($(
         $(#[$outer:meta])*
-        $vis:vis enum $Name:ident {
-            $($variant:ident = $value:expr),* $(,)?
+        // u16 is specified explicitly here for clarity at declaration sites
+        $vis:vis struct $Name:ident: u16 {
+            $( $(#[$inner:meta])* $variant:ident = $value:literal ),* $(,)?
         }
-    )+) => ($(
+    )*) => ($(
         $(#[$outer])*
         #[derive(Copy, Hash)]
         #[derive_const(Clone, PartialEq, Eq, PartialOrd, Ord)]
-        #[repr(u16)]
-        $vis enum $Name {
-            $( $variant = $value, )*
+        #[repr(transparent)]
+        $vis struct $Name(u16);
+
+        #[allow(non_upper_case_globals)]
+        impl $Name {
+            $( $(#[$inner])* pub const $variant: Self = Self($value); )*
         }
 
         impl $Name {
-            pub const fn new(value: u16) -> Option<Self> {
-                Some(match value {
-                    $( $value => Self::$variant, )*
+            pub const fn new(value: u16) -> Self {
+                Self(value)
+            }
+            pub const fn get(self) -> u16 {
+                self.0
+            }
+            #[allow(clippy::manual_range_patterns)]
+            pub const fn is_known(&self) -> bool {
+                matches!(self.0, $($value)|*)
+            }
+            pub const fn name(&self) -> Option<&'static str> {
+                Some(match self.0 {
+                    $( $value => stringify!($variant), )*
                     _ => return None,
                 })
-            }
-            pub const fn get(&self) -> u16 {
-                *self as u16
-            }
-            pub const fn name(&self) -> &'static str {
-                match *self {
-                    $( Self::$variant => stringify!($variant), )*
-                }
             }
         }
 
         impl std::fmt::Debug for $Name {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "{} ({})", self.get(), self.name())
+                write!(f, "{} ({})", self.get(), self.name().unwrap_or("Unknown"))
             }
         }
-    )+);
+    )*);
 }
-
-pub(crate) use define_u16_ids;
+use define_u16_ids;
 
 define_u16_ids! {
-    pub enum PlatformId {
+    pub struct PlatformId: u16 {
         Unicode = 0, Macintosh = 1, Iso = 2, Windows = 3, Custom = 4,
     }
 }
 
 impl PlatformId {
-    pub const fn encoding(&self, enc_id: u16) -> Option<EncodingId> {
-        Some(match self {
-            Self::Unicode => EncodingId::Unicode(UnicodeEncodingId::new(enc_id)?),
-            Self::Macintosh => EncodingId::Macintosh(MacintoshEncodingId::new(enc_id)?),
-            Self::Iso => EncodingId::Iso(IsoEncodingId::new(enc_id)?),
-            Self::Windows => EncodingId::Windows(WindowsEncodingId::new(enc_id)?),
-            Self::Custom => EncodingId::Custom(enc_id.try_into().ok()?),
-        })
+    pub const fn encoding(self, encoding: u16) -> EncodingId {
+        EncodingId::new(self, encoding)
     }
-
-    pub const fn language(&self, lang_id: u16) -> Option<LanguageId> {
-        if lang_id >= 0x8000 {
-            return Some(LanguageId::Tagged(lang_id));
-        }
-        Some(match self {
-            Self::Macintosh => LanguageId::Macintosh(lang_id),
-            Self::Windows => LanguageId::Windows(lang_id),
-            _ => return None,
-        })
+    pub const fn language(self, language: u16) -> LanguageId {
+        LanguageId::new(self, language)
     }
 }

@@ -1,10 +1,10 @@
 use crate::{
     platform::{EncodingError, EncodingId, PlatformId},
     tables::{Table, TableDirectory, TableError},
-    types::{Offset16, Tag, tags, uint16},
+    types::{BigEndian, Offset16, Tag, tags, uint16},
     util::{custom_iterator, fmt_with},
 };
-use std::{borrow::Cow, bstr::ByteStr};
+use std::bstr::ByteStr;
 
 #[repr(C)]
 pub struct NameV0 {
@@ -31,7 +31,7 @@ const impl std::ops::Deref for NameV1 {
 
 #[repr(C)]
 pub struct NameRecordRaw {
-    pub platform_id: uint16,
+    pub platform_id: BigEndian<PlatformId>,
     pub encoding_id: uint16,
     pub language_id: uint16,
     pub name_id: uint16,
@@ -157,13 +157,14 @@ impl NameV1 {
     }
 }
 
+#[repr(C)]
 pub struct StringStorage {
-    _dont_instantiate: (),
+    data: [u8; 0],
 }
 
 impl StringStorage {
     pub const fn as_ptr(&self) -> *const u8 {
-        std::ptr::from_ref(self).cast()
+        self.data.as_ptr()
     }
     pub(crate) const unsafe fn get(&self, offset: u16, length: u16) -> &[u8] {
         unsafe { std::slice::from_raw_parts(self.as_ptr().add(offset as _), length as _) }
@@ -193,17 +194,23 @@ const impl<'a> std::ops::Deref for LangTagRecord<'a> {
 
 impl<'a> NameRecord<'a> {
     pub const fn bytes(&self) -> &'a [u8] {
-        unsafe { self.0.string_storage().get(self.1.string_offset.get(), self.1.length.get()) }
+        unsafe { self.0.string_storage().get(self.string_offset.get(), self.length.get()) }
+    }
+    pub const fn encoding(&self) -> EncodingId {
+        self.platform_id.get().encoding(self.encoding_id.get())
     }
     pub fn string(&self) -> Result<String, EncodingError> {
-        let encoding = EncodingId::new(self.1.platform_id.get(), self.1.encoding_id.get())?;
-        encoding.decode_utf16be(self.bytes())
+        self.encoding().decode(self.bytes())
+    }
+    pub fn string_or_bytes(&self) -> Result<String, &'a ByteStr> {
+        let bytes = self.bytes();
+        self.encoding().decode(bytes).map_err(|_| ByteStr::new(bytes))
     }
 }
 
 impl<'a> LangTagRecord<'a> {
     pub const fn bytes(&self) -> &'a [u8] {
-        unsafe { self.0.string_storage().get(self.1.lang_tag_offset.get(), self.1.length.get()) }
+        unsafe { self.0.string_storage().get(self.lang_tag_offset.get(), self.length.get()) }
     }
     pub fn string(&self) -> String {
         // Note: LangTags are always encoded in UTF-16BE.
@@ -296,32 +303,19 @@ impl std::fmt::Debug for NameRecord<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let Self(name, rec) = *self;
 
-        // TODO: perhaps a string_or_bytes() method?
-        let value = self.string().map_err(|err| (err, ByteStr::new(self.bytes())));
-
-        // TODO: all of this stuff needs to be moved to {Platform,Encoding,Language}Id enums
-        let plat_id = PlatformId::new(rec.platform_id.get());
-        let plat_name = plat_id.map_or("Unknown", |x| x.name());
-
-        let enc_id = plat_id.and_then(|x| x.encoding(rec.encoding_id.get()));
-        let enc_name = enc_id.map_or(Cow::Borrowed("Unknown"), |x| x.name());
-
-        let lang_id = plat_id.and_then(|x| x.language(rec.language_id.get()));
-        let lang_name = format!(
-            "{}: {}",
-            lang_id.and_then(|x| x.tag(Some(name))).unwrap_or(Cow::Borrowed("und")),
-            lang_id.and_then(|x| x.english_name(Some(name))).unwrap_or(Cow::Borrowed("Unknown")),
-        );
+        let platform = rec.platform_id.get();
+        let encoding = platform.encoding(rec.encoding_id.get());
+        let language = platform.language(rec.language_id.get());
 
         f.debug_struct("NameRecord")
-            .field("platform_id", fmt_with!("{} ({})", rec.platform_id, plat_name))
-            .field("encoding_id", fmt_with!("{} ({})", rec.encoding_id, enc_name))
-            .field("language_id", fmt_with!("{:#06X} ({})", rec.language_id, lang_name))
+            .field("platform_id", &platform)
+            .field("encoding_id", &encoding)
+            .field("language_id", &language.display(Some(name)))
             // TODO: Parse name_id and display its name
             .field("name_id", &rec.name_id.get())
             .field("length", &rec.length.get())
             .field("string_offset", fmt_with!("{:#06X}", rec.string_offset))
-            .field("value", fmt_with!("{:?}", value))
+            .field("value", fmt_with!("{:?}", self.string_or_bytes()))
             .finish()
     }
 }
