@@ -1,22 +1,48 @@
-#[derive(Copy, Hash)]
-#[derive_const(Clone, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct CodePages(u64);
+macro_rules! define_codepages {
+    ($(
+        $bit_index:literal, $code_page:literal => $field:ident;
+    )*) => {
+        bitflags::bitflags! {
+            // TODO: When bitflags::Bits's Clone + PartialEq + Eq are constified, make derives const
+            #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+            pub struct CodePages: u64 {
+                $( const $field = 1 << $bit_index; )*
+            }
+        }
+
+        #[derive(Copy, Hash)]
+        #[derive_const(Clone, PartialEq, Eq)]
+        #[repr(u8)]
+        #[non_exhaustive]
+        pub enum CodePage {
+            $(#[doc(hidden)] $field = $bit_index,)*
+        }
+
+        impl CodePage {
+            pub const fn from_bit_index(bit_index: u8) -> Option<Self> {
+                Some(match bit_index { $($bit_index => Self::$field,)+ _ => return None })
+            }
+            #[allow(unreachable_patterns)]
+            pub const fn from_code_page(code_page: u16) -> Option<Self> {
+                Some(match code_page { 0 => return None, $($code_page => Self::$field,)+ _ => return None })
+            }
+            pub const fn bit_index(self) -> u8 {
+                self as u8
+            }
+            pub const fn name(&self) -> &'static str {
+                match self { $(Self::$field => stringify!($field),)* }
+            }
+            pub const fn code_page(&self) -> Option<u16> {
+                let code_page = match self { $(Self::$field => $code_page,)* };
+                if code_page != 0 { Some(code_page) } else { None }
+            }
+        }
+    };
+}
 
 impl CodePages {
-    pub const fn empty() -> Self {
-        Self(0)
-    }
-
-    pub const fn from_bits(bits: u64) -> Self {
-        Self(bits)
-    }
-    pub const fn bits(&self) -> u64 {
-        self.0
-    }
-
     pub const fn from_parts(ul1: u32, ul2: u32) -> Self {
-        Self((ul1 as u64) | ((ul2 as u64) << 32))
+        Self::from_bits_retain((ul1 as u64) | ((ul2 as u64) << 32))
     }
     pub const fn into_parts(self) -> (u32, u32) {
         (self.bits() as u32, (self.bits() >> 32) as u32)
@@ -25,60 +51,23 @@ impl CodePages {
     // TODO: iter CodePages
 }
 
+// TODO: impl Debug for CodePage and CodePages
+
 const impl From<CodePage> for CodePages {
     fn from(value: CodePage) -> Self {
-        Self(1 << value.bit_index())
-    }
-}
-const impl std::ops::BitOr for CodePages {
-    fn bitor(self, rhs: Self) -> Self::Output {
-        Self(self.0.bitor(rhs.0))
-    }
-    type Output = Self;
-}
-const impl std::ops::BitOrAssign for CodePages {
-    fn bitor_assign(&mut self, rhs: Self) {
-        self.0.bitor_assign(rhs.0);
+        Self::from_bits_retain(1 << value.bit_index())
     }
 }
 const impl std::ops::BitOr<CodePage> for CodePages {
-    fn bitor(self, rhs: CodePage) -> Self::Output {
-        self.bitor(Self::from(rhs))
-    }
     type Output = Self;
+    fn bitor(self, rhs: CodePage) -> Self::Output {
+        self.union(Self::from(rhs))
+    }
 }
 const impl std::ops::BitOrAssign<CodePage> for CodePages {
     fn bitor_assign(&mut self, rhs: CodePage) {
-        self.bitor_assign(Self::from(rhs));
+        *self = self.union(Self::from(rhs));
     }
-}
-
-macro_rules! define_codepages {
-    ($(
-        $bit_index:literal, $codepage:literal => $field:ident;
-    )*) => {
-        #[repr(u8)]
-        #[derive(Copy, Hash)]
-        #[derive_const(Clone, PartialEq, Eq)]
-        #[non_exhaustive]
-        pub enum CodePage {
-            $(#[doc(hidden)] $field,)*
-        }
-
-        impl CodePage {
-            pub const fn bit_index(&self) -> u8 {
-                match self {
-                    $(Self::$field => $bit_index,)*
-                }
-            }
-            pub const fn codepage(&self) -> Option<u16> {
-                let val = match self {
-                    $(Self::$field => $codepage,)*
-                };
-                if val != 0 { Some(val) } else { None }
-            }
-        }
-    };
 }
 
 define_codepages! {
@@ -92,13 +81,6 @@ define_codepages! {
     7, 1257 => Windows_Baltic;
     8, 1258 => Vietnamese;
     // 9-15 reserved for Alternate ANSI
-    9, 0 => Reserved9;
-    10, 0 => Reserved10;
-    11, 0 => Reserved11;
-    12, 0 => Reserved12;
-    13, 0 => Reserved13;
-    14, 0 => Reserved14;
-    15, 0 => Reserved15;
     16, 874 => Thai;
     17, 932 => JIS_Japan;
     18, 936 => Chinese_Simplified_chars_PRC_and_Singapore;
@@ -106,33 +88,10 @@ define_codepages! {
     20, 950 => Chinese_Traditional_chars_Taiwan_and_Hong_Kong_SAR;
     21, 1361 => Korean_Johab;
     // 22-28 reserved for Alternate ANSI or OEM
-    22, 0 => Reserved22;
-    23, 0 => Reserved23;
-    24, 0 => Reserved24;
-    25, 0 => Reserved25;
-    26, 0 => Reserved26;
-    27, 0 => Reserved27;
-    28, 0 => Reserved28;
     29, 0 => Macintosh_Character_Set_US_Roman;
     30, 0 => OEM_Character_Set;
     31, 0 => Symbol_Character_Set;
     // 32-47 reserved for OEM
-    32, 0 => Reserved32;
-    33, 0 => Reserved33;
-    34, 0 => Reserved34;
-    35, 0 => Reserved35;
-    36, 0 => Reserved36;
-    37, 0 => Reserved37;
-    38, 0 => Reserved38;
-    39, 0 => Reserved39;
-    40, 0 => Reserved40;
-    41, 0 => Reserved41;
-    42, 0 => Reserved42;
-    43, 0 => Reserved43;
-    44, 0 => Reserved44;
-    45, 0 => Reserved45;
-    46, 0 => Reserved46;
-    47, 0 => Reserved47;
     48, 869 => IBM_Greek;
     49, 866 => MS_DOS_Russian;
     50, 865 => MS_DOS_Nordic;

@@ -1,22 +1,49 @@
-#[derive(Copy, Hash)]
-#[derive_const(Clone, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct UnicodeRanges(u128);
+macro_rules! define_unicode_ranges {
+    ($(
+        $bit_index:literal, $from:literal ..= $to:literal => $field:ident $((v $version:literal))?;
+    )*) => {
+        bitflags::bitflags! {
+            // TODO: When bitflags::Bits's Clone + PartialEq + Eq are constified, make derives const
+            #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+            pub struct UnicodeRanges: u128 {
+                $( const $field = 1 << $bit_index; )*
+            }
+        }
+
+        #[derive(Copy, Hash)]
+        #[derive_const(Clone, PartialEq, Eq)]
+        #[repr(u8)]
+        #[non_exhaustive]
+        pub enum UnicodeRange {
+            $(#[doc(hidden)] $field,)*
+        }
+
+        impl UnicodeRange {
+            #[allow(unreachable_patterns)]
+            pub const fn from_char(ch: char) -> Option<Self> {
+                Some(match ch as u32 { $($from..=$to => Self::$field,)* _ => return None })
+            }
+            pub const fn bit_index(&self) -> u8 {
+                match self { $(Self::$field => $bit_index,)* }
+            }
+            pub const fn name(&self) -> &'static str {
+                match self { $(Self::$field => stringify!($field),)* }
+            }
+            pub const fn range(&self) -> std::ops::RangeInclusive<u32> {
+                match self { $(Self::$field => $from..=$to,)* }
+            }
+            pub const fn version(&self) -> u8 {
+                match self { $(Self::$field => define_unicode_ranges!(@since $($version)?),)* }
+            }
+        }
+    };
+    (@since) => (1);
+    (@since $version:literal) => ($version);
+}
 
 impl UnicodeRanges {
-    pub const fn empty() -> Self {
-        Self(0)
-    }
-
-    pub const fn from_bits(bits: u128) -> Self {
-        Self(bits)
-    }
-    pub const fn bits(&self) -> u128 {
-        self.0
-    }
-
     pub const fn from_parts(ul1: u32, ul2: u32, ul3: u32, ul4: u32) -> Self {
-        Self::from_bits(
+        Self::from_bits_retain(
             (ul1 as u128) | ((ul2 as u128) << 32) | ((ul3 as u128) << 64) | ((ul4 as u128) << 96),
         )
     }
@@ -29,13 +56,15 @@ impl UnicodeRanges {
         )
     }
 
-    pub fn from_chars(iter: impl IntoIterator<Item = char>) -> Self {
+    pub fn from_chars(iter: impl IntoIterator<Item = char>, version: u8) -> Self {
         iter.into_iter().fold(Self::empty(), |mut acc, ch| {
-            if let Some(range) = UnicodeRange::from_char(ch) {
+            if let Some(range) = UnicodeRange::from_char(ch)
+                && version >= range.version()
+            {
                 acc |= range;
             }
             if matches!(ch as u32, 0x10000..=0x10FFFF) {
-                acc |= Self::from_bits(1 << 57);
+                acc |= UnicodeRange::Non_Plane_0;
             }
             acc
         })
@@ -44,85 +73,23 @@ impl UnicodeRanges {
     // TODO: iter UnicodeRanges
 }
 
+// TODO: impl Debug for UnicodeRange and UnicodeRanges
+
 const impl From<UnicodeRange> for UnicodeRanges {
     fn from(value: UnicodeRange) -> Self {
-        Self(1 << value.bit_index())
-    }
-}
-const impl std::ops::BitOr for UnicodeRanges {
-    fn bitor(self, rhs: Self) -> Self::Output {
-        Self(self.0.bitor(rhs.0))
-    }
-    type Output = Self;
-}
-const impl std::ops::BitOrAssign for UnicodeRanges {
-    fn bitor_assign(&mut self, rhs: Self) {
-        self.0.bitor_assign(rhs.0);
+        Self::from_bits_retain(1 << value.bit_index())
     }
 }
 const impl std::ops::BitOr<UnicodeRange> for UnicodeRanges {
-    fn bitor(self, rhs: UnicodeRange) -> Self::Output {
-        self.bitor(Self::from(rhs))
-    }
     type Output = Self;
+    fn bitor(self, rhs: UnicodeRange) -> Self::Output {
+        self.union(Self::from(rhs))
+    }
 }
 const impl std::ops::BitOrAssign<UnicodeRange> for UnicodeRanges {
     fn bitor_assign(&mut self, rhs: UnicodeRange) {
-        self.bitor_assign(Self::from(rhs));
+        *self = self.union(Self::from(rhs));
     }
-}
-
-macro_rules! define_unicode_ranges {
-    ($(
-        $bit_index:literal, $from:literal ..= $to:literal => $field:ident $((v $version:literal))?;
-    )*) => {
-        #[repr(u8)]
-        #[derive(Copy, Hash)]
-        #[derive_const(Clone, PartialEq, Eq)]
-        #[non_exhaustive]
-        pub enum UnicodeRange {
-            $(#[doc(hidden)] $field,)*
-            Non_Plane_0,
-        }
-
-        impl UnicodeRange {
-            #[allow(unreachable_patterns)]
-            pub const fn from_char(ch: char) -> Option<Self> {
-                Some(match ch as u32 {
-                    $($from..=$to => Self::$field,)*
-                    0x10000..=0x10FFFF => Self::Non_Plane_0,
-                    _ => return None,
-                })
-            }
-            pub const fn bit_index(&self) -> u8 {
-                match self {
-                    $(Self::$field => $bit_index,)*
-                    Self::Non_Plane_0 => 57,
-                }
-            }
-            pub const fn name(&self) -> &'static str {
-                match self {
-                    $(Self::$field => stringify!($field),)*
-                    Self::Non_Plane_0 => "Non_Plane_0",
-                }
-            }
-            pub const fn range(&self) -> Option<(u32, u32)> {
-                let (from, to) = match self {
-                    $(Self::$field => ($from, $to),)*
-                    Self::Non_Plane_0 => (0, 0),
-                };
-                if to != 0 { Some((from, to)) } else { None }
-            }
-            pub const fn version(&self) -> u8 {
-                match self {
-                    $(Self::$field => define_unicode_ranges!(@since $($version)?),)*
-                    Self::Non_Plane_0 => 2,
-                }
-            }
-        }
-    };
-    (@since) => (1);
-    (@since $version:literal) => ($version);
 }
 
 define_unicode_ranges! {
@@ -207,9 +174,9 @@ define_unicode_ranges! {
     54, 0x3200..=0x32FF => Enclosed_CJK_Letters_And_Months;
     55, 0x3300..=0x33FF => CJK_Compatibility;
     56, 0xAC00..=0xD7AF => Hangul_Syllables;
-    // Note: Non_Plane_0 is handled separately in UnicodeRanges
-    // TODO: Maybe we should just ignore it? And add/remove as needed in UnicodeRanges?
-    // 57, 0x10000..=0x10FFFF => Non_Plane_0 (v 2);
+    // Note: 57, Non_Plane_0 is located at the end of this macro, since it encompasses a bunch of
+    // other ranges, so it will only catch chars that weren't in any of the more specific ranges.
+    // Also, Non_Plane_0 is the only range that intersects with others.
     58, 0x10900..=0x1091F => Phoenician (v 4);
     59, 0x4E00..=0x9FFF => CJK_Unified_Ideographs;
     59, 0x2E80..=0x2EFF => CJK_Radicals_Supplement (v 2);
@@ -301,9 +268,6 @@ define_unicode_ranges! {
     121, 0x10920..=0x1093F => Lydian (v 4);
     122, 0x1F030..=0x1F09F => Domino_Tiles (v 4);
     122, 0x1F000..=0x1F02F => Mahjong_Tiles (v 4);
-    123, 0..=0 => Reserved123;
-    124, 0..=0 => Reserved124;
-    125, 0..=0 => Reserved125;
-    126, 0..=0 => Reserved126;
-    127, 0..=0 => Reserved127;
+    // 123-127 reserved
+    57, 0x10000..=0x10FFFF => Non_Plane_0 (v 2);
 }
