@@ -296,16 +296,15 @@ custom_iterator!(LangTagRecordsIter<'a> as this {
 
 impl std::fmt::Debug for Name<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut f = f.debug_struct("NameTable");
-
-        f.field("version", &self.version.get())
-            .field("count", &self.count.get())
-            .field("storage_offset", fmt_with!("{:#06X}", self.storage_offset))
-            .field("name_records", &self.names());
+        let mut f = f.debug_struct("name");
+        f.field("version", &self.version.get());
+        f.field("count", &self.count.get());
+        f.field("storage_offset", fmt_with!("{:#06X}", self.storage_offset));
+        f.field("name_records", &self.names());
 
         if let Some(v1) = self.v1() {
-            f.field("lang_tag_count", &v1.lang_tag_records().len());
-            f.field("lang_tag_records", &self.lang_tags());
+            f.field("lang_tag_count", &v1.lang_tag_count());
+            f.field("lang_tag_records", &v1.lang_tags());
         }
 
         f.finish()
@@ -337,19 +336,18 @@ impl<'a> std::fmt::Debug for LangTagRecordsIter<'a> {
 
 impl std::fmt::Debug for NameRecord<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let Self(name, rec) = *self;
-
-        let platform = rec.platform_id.get();
-        let encoding = platform.encoding(rec.encoding_id.get());
-        let language = platform.language(rec.language_id.get());
+        let platform = self.platform_id.get();
+        let encoding = platform.encoding(self.encoding_id.get());
+        let language = platform.language(self.language_id.get());
 
         f.debug_struct("NameRecord")
             .field("platform_id", &platform)
             .field("encoding_id", &encoding)
-            .field("language_id", &language.display(Some(name)))
-            .field("name_id", &rec.name_id.get())
-            .field("length", &rec.length.get())
-            .field("string_offset", fmt_with!("{:#06X}", rec.string_offset))
+            .field("language_id", &language.display(Some(self.0)))
+            .field("name_id", &self.name_id.get())
+            .field("length", &self.length.get())
+            .field("string_offset", fmt_with!("{:#06X}", self.string_offset))
+            // Avoid pretty-printing the Result enum for better display
             .field("value", fmt_with!("{:?}", self.string_or_bytes()))
             .finish()
     }
@@ -357,11 +355,9 @@ impl std::fmt::Debug for NameRecord<'_> {
 
 impl std::fmt::Debug for LangTagRecord<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let Self(_, rec) = *self;
-
         f.debug_struct("LangTagRecord")
-            .field("length", &rec.length.get())
-            .field("lang_tag_offset", fmt_with!("{:#06X}", rec.lang_tag_offset))
+            .field("length", &self.length.get())
+            .field("lang_tag_offset", fmt_with!("{:#06X}", self.lang_tag_offset))
             .field("value", &self.string())
             .finish()
     }

@@ -121,9 +121,9 @@ impl<'a> Hhea<'a> {
 
 impl std::fmt::Debug for Hhea<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut f = f.debug_struct("HheaTable");
-        f.field("major_version", &self.major_version.get())
-            .field("minor_version", &self.minor_version.get());
+        let mut f = f.debug_struct("hhea");
+        f.field("major_version", &self.major_version.get());
+        f.field("minor_version", &self.minor_version.get());
 
         if let Some(v1) = self.v1() {
             f.field("ascender", &v1.ascender.get());

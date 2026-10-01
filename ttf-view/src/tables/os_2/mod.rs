@@ -240,59 +240,59 @@ impl std::fmt::Debug for Os_2<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut f = f.debug_struct("OS/2");
 
-        f.field("version", &self.version.get())
-            .field("x_avg_char_width", &self.x_avg_char_width.get())
-            .field("us_weight_class", &self.us_weight_class.get())
-            .field("us_width_class", &self.us_width_class.get())
-            .field("fs_type", fmt_with!("{:#010b}", self.fs_type))
-            // TODO: combine into ScriptMetrics struct (and add getter)
-            .field("y_subscript_x_size", &self.y_subscript_x_size.get())
-            .field("y_subscript_y_size", &self.y_subscript_y_size.get())
-            .field("y_subscript_x_offset", &self.y_subscript_x_offset.get())
-            .field("y_subscript_y_offset", &self.y_subscript_y_offset.get())
-            .field("y_superscript_x_size", &self.y_superscript_x_size.get())
-            .field("y_superscript_y_size", &self.y_superscript_y_size.get())
-            .field("y_superscript_x_offset", &self.y_superscript_x_offset.get())
-            .field("y_superscript_y_offset", &self.y_superscript_y_offset.get())
-            // TODO: combine into StrikeoutMetrics (and add getter)
-            .field("y_strikeout_size", &self.y_strikeout_size.get())
-            .field("y_strikeout_position", &self.y_strikeout_position.get())
-            .field("s_family_class", &self.s_family_class.get())
-            .field("panose", &self.panose)
-            // TODO: impl Debug for UnicodeRanges
-            .field("ul_unicode_range_1", &self.ul_unicode_range_1.get())
-            .field("ul_unicode_range_2", &self.ul_unicode_range_2.get())
-            .field("ul_unicode_range_3", &self.ul_unicode_range_3.get())
-            .field("ul_unicode_range_4", &self.ul_unicode_range_4.get())
-            .field("ach_vend_id", &self.ach_vend_id)
-            .field("fs_selection", &self.fs_selection.get())
-            .field("us_first_char_index", &self.us_first_char_index.get())
-            .field("us_last_char_index", &self.us_last_char_index.get());
+        f.field("version", &self.version.get());
+        f.field("x_avg_char_width", &self.x_avg_char_width.get());
+        f.field("us_weight_class", &self.us_weight_class.get());
+        f.field("us_width_class", &self.us_width_class.get());
+        f.field("fs_type", fmt_with!("{:#010b}", self.fs_type));
+        // TODO: combine into ScriptMetrics struct (and add getter)
+        f.field("y_subscript_x_size", &self.y_subscript_x_size.get());
+        f.field("y_subscript_y_size", &self.y_subscript_y_size.get());
+        f.field("y_subscript_x_offset", &self.y_subscript_x_offset.get());
+        f.field("y_subscript_y_offset", &self.y_subscript_y_offset.get());
+        f.field("y_superscript_x_size", &self.y_superscript_x_size.get());
+        f.field("y_superscript_y_size", &self.y_superscript_y_size.get());
+        f.field("y_superscript_x_offset", &self.y_superscript_x_offset.get());
+        f.field("y_superscript_y_offset", &self.y_superscript_y_offset.get());
+        // TODO: combine into StrikeoutMetrics (and add getter)
+        f.field("y_strikeout_size", &self.y_strikeout_size.get());
+        f.field("y_strikeout_position", &self.y_strikeout_position.get());
+        f.field("s_family_class", &self.s_family_class.get());
+        f.field("panose", &self.panose);
+        // TODO: impl Debug for UnicodeRanges
+        f.field("ul_unicode_range_1", &self.ul_unicode_range_1.get());
+        f.field("ul_unicode_range_2", &self.ul_unicode_range_2.get());
+        f.field("ul_unicode_range_3", &self.ul_unicode_range_3.get());
+        f.field("ul_unicode_range_4", &self.ul_unicode_range_4.get());
+        f.field("ach_vend_id", &self.ach_vend_id);
+        f.field("fs_selection", &self.fs_selection.get());
+        f.field("us_first_char_index", &self.us_first_char_index.get());
+        f.field("us_last_char_index", &self.us_last_char_index.get());
 
         if let Some(v0) = self.v0() {
             // TODO: combine into TypoMetrics (and add getter) (maybe?)
-            f.field("s_typo_ascender", &v0.s_typo_ascender.get())
-                .field("s_typo_descender", &v0.s_typo_descender.get())
-                .field("s_typo_line_gap", &v0.s_typo_line_gap.get())
-                .field("us_win_ascent", &v0.us_win_ascent.get())
-                .field("us_win_descent", &v0.us_win_descent.get());
+            f.field("s_typo_ascender", &v0.s_typo_ascender.get());
+            f.field("s_typo_descender", &v0.s_typo_descender.get());
+            f.field("s_typo_line_gap", &v0.s_typo_line_gap.get());
+            f.field("us_win_ascent", &v0.us_win_ascent.get());
+            f.field("us_win_descent", &v0.us_win_descent.get());
         }
         if let Some(v1) = self.v1() {
             // TODO: impl Debug for CodePages
-            f.field("ul_code_page_range_1", &v1.ul_code_page_range_1.get())
-                .field("ul_code_page_range_2", &v1.ul_code_page_range_2.get());
+            f.field("ul_code_page_range_1", &v1.ul_code_page_range_1.get());
+            f.field("ul_code_page_range_2", &v1.ul_code_page_range_2.get());
         }
         if let Some(v4) = self.v4() {
-            f.field("sx_height", &v4.sx_height.get())
-                .field("s_cap_height", &v4.s_cap_height.get())
-                // TODO: display something like 'X' (U+CODE) (and add getter () -> char)
-                .field("us_default_char", &v4.us_default_char.get())
-                .field("us_break_char", &v4.us_break_char.get())
-                .field("us_max_content", &v4.us_max_content.get());
+            f.field("sx_height", &v4.sx_height.get());
+            f.field("s_cap_height", &v4.s_cap_height.get());
+            // TODO: display something like 'X' (U+CODE) (and add getter () -> char)
+            f.field("us_default_char", &v4.us_default_char.get());
+            f.field("us_break_char", &v4.us_break_char.get());
+            f.field("us_max_content", &v4.us_max_content.get());
         }
         if let Some(v5) = self.v5() {
-            f.field("us_lower_optical_point_size", &v5.us_lower_optical_point_size.get())
-                .field("us_upper_optical_point_size", &v5.us_upper_optical_point_size.get());
+            f.field("us_lower_optical_point_size", &v5.us_lower_optical_point_size.get());
+            f.field("us_upper_optical_point_size", &v5.us_upper_optical_point_size.get());
         }
 
         f.finish()

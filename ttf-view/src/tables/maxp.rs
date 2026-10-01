@@ -146,7 +146,7 @@ impl<'a> Maxp<'a> {
 
 impl std::fmt::Debug for Maxp<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut f = f.debug_struct("MaxpTable");
+        let mut f = f.debug_struct("maxp");
         f.field("version", &self.version);
 
         if let Some(v05) = self.v05() {

@@ -252,6 +252,7 @@ impl std::fmt::Debug for DataMapRecord<'_> {
             .field("tag", &self.tag)
             .field("data_offset", fmt_with!("{:#010X}", self.data_offset))
             .field("data_length", &self.data_length.get())
+            // Avoid pretty-printing the Result enum for better display
             .field("data", fmt_with!("{:?}", self.utf8_or_bytes()))
             .finish()
     }

@@ -134,9 +134,9 @@ impl<'a> Head<'a> {
 
 impl std::fmt::Debug for Head<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut f = f.debug_struct("HeadTable");
-        f.field("major_version", &self.major_version.get())
-            .field("minor_version", &self.minor_version.get());
+        let mut f = f.debug_struct("head");
+        f.field("major_version", &self.major_version.get());
+        f.field("minor_version", &self.minor_version.get());
 
         if let Some(v1) = self.v1() {
             f.field("font_revision", &v1.font_revision);

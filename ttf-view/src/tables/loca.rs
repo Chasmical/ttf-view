@@ -206,7 +206,6 @@ impl<'a> std::iter::FusedIterator for Iter<'a> {}
 impl std::fmt::Debug for Loca<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut f = f.debug_struct("loca");
-
         f.field("index_to_loc_format", fmt_with!("{} ({:?})", self.format as i16, self.format));
         f.field("num_glyphs", &self.num_glyphs());
 

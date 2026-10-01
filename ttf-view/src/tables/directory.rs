@@ -167,6 +167,7 @@ impl<'a> std::fmt::Debug for TableRecordsIter<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut list = f.debug_list();
         for table in self.as_records() {
+            // Avoid pretty-printing the table records for better display
             list.entry(fmt_with!("{:?}", table));
         }
         list.finish()
