@@ -199,11 +199,11 @@ impl<'a> Os_2<'a> {
     }
 
     // version ≥ 1:
-    pub const fn ul_code_page_range_1(&self) -> Option<uint32> {
-        Some(self.v1()?.ul_code_page_range_1)
+    pub const fn ul_code_page_range_1(&self) -> Option<u32> {
+        Some(self.v1()?.ul_code_page_range_1.get())
     }
-    pub const fn ul_code_page_range_2(&self) -> Option<uint32> {
-        Some(self.v1()?.ul_code_page_range_2)
+    pub const fn ul_code_page_range_2(&self) -> Option<u32> {
+        Some(self.v1()?.ul_code_page_range_2.get())
     }
     pub const fn code_page_range(&self) -> Option<CodePages> {
         let v1 = self.v1()?;
@@ -217,22 +217,22 @@ impl<'a> Os_2<'a> {
     pub const fn s_cap_height(&self) -> Option<FWORD> {
         Some(self.v4()?.s_cap_height)
     }
-    pub const fn us_default_char(&self) -> Option<uint16> {
-        Some(self.v4()?.us_default_char)
+    pub const fn us_default_char(&self) -> Option<u16> {
+        Some(self.v4()?.us_default_char.get())
     }
-    pub const fn us_break_char(&self) -> Option<uint16> {
-        Some(self.v4()?.us_break_char)
+    pub const fn us_break_char(&self) -> Option<u16> {
+        Some(self.v4()?.us_break_char.get())
     }
-    pub const fn us_max_content(&self) -> Option<uint16> {
-        Some(self.v4()?.us_max_content)
+    pub const fn us_max_content(&self) -> Option<u16> {
+        Some(self.v4()?.us_max_content.get())
     }
 
     // version ≥ 5:
-    pub const fn us_lower_optical_point_size(&self) -> Option<uint16> {
-        Some(self.v5()?.us_lower_optical_point_size)
+    pub const fn us_lower_optical_point_size(&self) -> Option<u16> {
+        Some(self.v5()?.us_lower_optical_point_size.get())
     }
-    pub const fn us_upper_optical_point_size(&self) -> Option<uint16> {
-        Some(self.v5()?.us_upper_optical_point_size)
+    pub const fn us_upper_optical_point_size(&self) -> Option<u16> {
+        Some(self.v5()?.us_upper_optical_point_size.get())
     }
 }
 

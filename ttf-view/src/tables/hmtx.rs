@@ -32,14 +32,13 @@ impl<'a> Table<'a> for Hmtx<'a> {
             .map_err(|_| TableError::Dependency(tags::hhea))?
             .number_of_h_metrics()
             .ok_or(TableError::DependencyError(&"number_of_h_metrics not found"))?
-            .get() as usize;
+            as usize;
 
-        let num_glyphs = dir
-            .maxp()
-            .map_err(|_| TableError::Dependency(tags::maxp))?
-            .num_glyphs()
-            .ok_or(TableError::DependencyError(&"num_glyphs not found"))?
-            .get() as usize;
+        let num_glyphs =
+            dir.maxp()
+                .map_err(|_| TableError::Dependency(tags::maxp))?
+                .num_glyphs()
+                .ok_or(TableError::DependencyError(&"num_glyphs not found"))? as usize;
 
         let total_word_count = num_h_metrics + num_glyphs;
         let raw_words = unsafe { std::slice::from_raw_parts(raw_words, total_word_count) };

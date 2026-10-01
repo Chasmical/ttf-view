@@ -81,29 +81,21 @@ impl<'a> Head<'a> {
         }
     }
 
-    // TODO: We've got two options here, we either:
-    // 1) return Option<&T>, references to big-endian fields, which probably should be fine.
-    //    It would make writing some low-level utils a bit easier. But on the other hand it
-    //    postpones the endianness conversion, which could be inconvenient.
-    // 2) return Option<T>, endianness-converted values. Convenient, and users don't need to
-    //    depend on zerocopy to have the return types available (HeadV0, HeadV1 will still have
-    //    zerocopy's types though).
-
     // version = 1.x:
     pub const fn font_revision(&self) -> Option<Fixed> {
         Some(self.v1()?.font_revision.get())
     }
-    pub const fn checksum_adjustment(&self) -> Option<uint32> {
-        Some(self.v1()?.checksum_adjustment)
+    pub const fn checksum_adjustment(&self) -> Option<u32> {
+        Some(self.v1()?.checksum_adjustment.get())
     }
-    pub const fn magic_number(&self) -> Option<uint32> {
-        Some(self.v1()?.magic_number)
+    pub const fn magic_number(&self) -> Option<u32> {
+        Some(self.v1()?.magic_number.get())
     }
-    pub const fn flags(&self) -> Option<uint16> {
-        Some(self.v1()?.flags)
+    pub const fn flags(&self) -> Option<u16> {
+        Some(self.v1()?.flags.get())
     }
-    pub const fn units_per_em(&self) -> Option<uint16> {
-        Some(self.v1()?.units_per_em)
+    pub const fn units_per_em(&self) -> Option<u16> {
+        Some(self.v1()?.units_per_em.get())
     }
     pub const fn created(&self) -> Option<LongDateTime> {
         Some(self.v1()?.created.get())
@@ -111,32 +103,32 @@ impl<'a> Head<'a> {
     pub const fn modified(&self) -> Option<LongDateTime> {
         Some(self.v1()?.modified.get())
     }
-    pub const fn x_min(&self) -> Option<int16> {
-        Some(self.v1()?.x_min)
+    pub const fn x_min(&self) -> Option<i16> {
+        Some(self.v1()?.x_min.get())
     }
-    pub const fn y_min(&self) -> Option<int16> {
-        Some(self.v1()?.y_min)
+    pub const fn y_min(&self) -> Option<i16> {
+        Some(self.v1()?.y_min.get())
     }
-    pub const fn x_max(&self) -> Option<int16> {
-        Some(self.v1()?.x_max)
+    pub const fn x_max(&self) -> Option<i16> {
+        Some(self.v1()?.x_max.get())
     }
-    pub const fn y_max(&self) -> Option<int16> {
-        Some(self.v1()?.y_max)
+    pub const fn y_max(&self) -> Option<i16> {
+        Some(self.v1()?.y_max.get())
     }
-    pub const fn mac_style(&self) -> Option<uint16> {
-        Some(self.v1()?.mac_style)
+    pub const fn mac_style(&self) -> Option<u16> {
+        Some(self.v1()?.mac_style.get())
     }
-    pub const fn lowest_rec_ppem(&self) -> Option<uint16> {
-        Some(self.v1()?.lowest_rec_ppem)
+    pub const fn lowest_rec_ppem(&self) -> Option<u16> {
+        Some(self.v1()?.lowest_rec_ppem.get())
     }
-    pub const fn font_direction_hint(&self) -> Option<int16> {
-        Some(self.v1()?.font_direction_hint)
+    pub const fn font_direction_hint(&self) -> Option<i16> {
+        Some(self.v1()?.font_direction_hint.get())
     }
-    pub const fn index_to_loc_format(&self) -> Option<int16> {
-        Some(self.v1()?.index_to_loc_format)
+    pub const fn index_to_loc_format(&self) -> Option<i16> {
+        Some(self.v1()?.index_to_loc_format.get())
     }
-    pub const fn glyph_data_format(&self) -> Option<int16> {
-        Some(self.v1()?.glyph_data_format)
+    pub const fn glyph_data_format(&self) -> Option<i16> {
+        Some(self.v1()?.glyph_data_format.get())
     }
 }
 

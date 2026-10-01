@@ -52,15 +52,14 @@ impl<'a> Table<'a> for Loca<'a> {
             .index_to_loc_format()
             .ok_or(TableError::DependencyError(&"index_to_loc_format not found"))
             .and_then(|format| {
-                LocaFormat::try_from(format.get()).map_err(|_| TableError::UnknownFormat)
+                LocaFormat::try_from(format).map_err(|_| TableError::UnknownFormat)
             })?;
 
         let num_glyphs = dir
             .maxp()
             .map_err(|_| TableError::Dependency(tags::maxp))?
             .num_glyphs()
-            .ok_or(TableError::DependencyError(&"num_glyphs not found"))?
-            .get();
+            .ok_or(TableError::DependencyError(&"num_glyphs not found"))?;
 
         let ptr = NonNull::from_ref(rec.raw_as::<()>().unwrap());
 

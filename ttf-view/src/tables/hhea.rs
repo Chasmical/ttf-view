@@ -102,20 +102,20 @@ impl<'a> Hhea<'a> {
     pub const fn x_max_extent(&self) -> Option<FWORD> {
         Some(self.v1()?.x_max_extent)
     }
-    pub const fn caret_slope_rise(&self) -> Option<int16> {
-        Some(self.v1()?.caret_slope_rise)
+    pub const fn caret_slope_rise(&self) -> Option<i16> {
+        Some(self.v1()?.caret_slope_rise.get())
     }
-    pub const fn caret_slope_run(&self) -> Option<int16> {
-        Some(self.v1()?.caret_slope_run)
+    pub const fn caret_slope_run(&self) -> Option<i16> {
+        Some(self.v1()?.caret_slope_run.get())
     }
-    pub const fn caret_offset(&self) -> Option<int16> {
-        Some(self.v1()?.caret_offset)
+    pub const fn caret_offset(&self) -> Option<i16> {
+        Some(self.v1()?.caret_offset.get())
     }
-    pub const fn metric_data_format(&self) -> Option<int16> {
-        Some(self.v1()?.metric_data_format)
+    pub const fn metric_data_format(&self) -> Option<i16> {
+        Some(self.v1()?.metric_data_format.get())
     }
-    pub const fn number_of_h_metrics(&self) -> Option<uint16> {
-        Some(self.v1()?.number_of_h_metrics)
+    pub const fn number_of_h_metrics(&self) -> Option<u16> {
+        Some(self.v1()?.number_of_h_metrics.get())
     }
 }
 

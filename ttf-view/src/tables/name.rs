@@ -108,7 +108,7 @@ impl<'a> Table<'a> for Name<'a> {
             }
 
             let v1 = rec.raw_as::<NameV1>().unwrap();
-            required_len += v1.lang_tag_count().get() as usize * size_of::<LangTagRecordRaw>();
+            required_len += v1.lang_tag_count() as usize * size_of::<LangTagRecordRaw>();
 
             // Validate that all lang tag records are in range
             if (rec.length.get() as usize) < required_len {
@@ -162,7 +162,7 @@ impl<'a> Name<'a> {
     }
 
     // version ≥ 1:
-    pub const fn lang_tag_count(&self) -> Option<uint16> {
+    pub const fn lang_tag_count(&self) -> Option<u16> {
         Some(self.v1()?.lang_tag_count())
     }
     pub const fn lang_tag_records(&self) -> Option<&'a [LangTagRecordRaw]> {
@@ -181,12 +181,15 @@ impl NameV0 {
 }
 
 impl NameV1 {
-    pub const fn lang_tag_count(&self) -> uint16 {
-        unsafe { *self.name_records().as_ptr_range().end.cast::<uint16>() }
+    pub const fn lang_tag_count(&self) -> u16 {
+        unsafe { &*self.name_records().as_ptr_range().end.cast::<uint16>() }.get()
     }
     pub const fn lang_tag_records(&self) -> &[LangTagRecordRaw] {
         let len_ptr = self.name_records().as_ptr_range().end.cast::<uint16>();
         unsafe { std::slice::from_raw_parts(len_ptr.add(1).cast(), (*len_ptr).get() as _) }
+    }
+    pub const fn lang_tags(&self) -> LangTagRecordsIter<'_> {
+        LangTagRecordsIter::new(Name { name: self })
     }
 }
 
@@ -236,8 +239,8 @@ impl<'a> NameRecord<'a> {
         self.encoding().decode(self.bytes())
     }
     pub fn string_or_bytes(&self) -> Result<String, &'a ByteStr> {
-        let bytes = self.bytes();
-        self.encoding().decode(bytes).map_err(|_| ByteStr::new(bytes))
+        let bytes = ByteStr::new(self.bytes());
+        self.encoding().decode(bytes).or(Err(bytes))
     }
 }
 

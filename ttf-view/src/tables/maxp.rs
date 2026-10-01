@@ -98,49 +98,49 @@ impl<'a> Maxp<'a> {
     }
 
     // version ≥ 0.5:
-    pub const fn num_glyphs(&self) -> Option<uint16> {
-        Some(self.v05()?.num_glyphs)
+    pub const fn num_glyphs(&self) -> Option<u16> {
+        Some(self.v05()?.num_glyphs.get())
     }
 
     // version ≥ 1.0:
-    pub const fn max_points(&self) -> Option<uint16> {
-        Some(self.v1()?.max_points)
+    pub const fn max_points(&self) -> Option<u16> {
+        Some(self.v1()?.max_points.get())
     }
-    pub const fn max_contours(&self) -> Option<uint16> {
-        Some(self.v1()?.max_contours)
+    pub const fn max_contours(&self) -> Option<u16> {
+        Some(self.v1()?.max_contours.get())
     }
-    pub const fn max_composite_points(&self) -> Option<uint16> {
-        Some(self.v1()?.max_composite_points)
+    pub const fn max_composite_points(&self) -> Option<u16> {
+        Some(self.v1()?.max_composite_points.get())
     }
-    pub const fn max_composite_contours(&self) -> Option<uint16> {
-        Some(self.v1()?.max_composite_contours)
+    pub const fn max_composite_contours(&self) -> Option<u16> {
+        Some(self.v1()?.max_composite_contours.get())
     }
-    pub const fn max_zones(&self) -> Option<uint16> {
-        Some(self.v1()?.max_zones)
+    pub const fn max_zones(&self) -> Option<u16> {
+        Some(self.v1()?.max_zones.get())
     }
-    pub const fn max_twilight_points(&self) -> Option<uint16> {
-        Some(self.v1()?.max_twilight_points)
+    pub const fn max_twilight_points(&self) -> Option<u16> {
+        Some(self.v1()?.max_twilight_points.get())
     }
-    pub const fn max_storage(&self) -> Option<uint16> {
-        Some(self.v1()?.max_storage)
+    pub const fn max_storage(&self) -> Option<u16> {
+        Some(self.v1()?.max_storage.get())
     }
-    pub const fn max_function_defs(&self) -> Option<uint16> {
-        Some(self.v1()?.max_function_defs)
+    pub const fn max_function_defs(&self) -> Option<u16> {
+        Some(self.v1()?.max_function_defs.get())
     }
-    pub const fn max_instruction_defs(&self) -> Option<uint16> {
-        Some(self.v1()?.max_instruction_defs)
+    pub const fn max_instruction_defs(&self) -> Option<u16> {
+        Some(self.v1()?.max_instruction_defs.get())
     }
-    pub const fn max_stack_elements(&self) -> Option<uint16> {
-        Some(self.v1()?.max_stack_elements)
+    pub const fn max_stack_elements(&self) -> Option<u16> {
+        Some(self.v1()?.max_stack_elements.get())
     }
-    pub const fn max_size_of_instructions(&self) -> Option<uint16> {
-        Some(self.v1()?.max_size_of_instructions)
+    pub const fn max_size_of_instructions(&self) -> Option<u16> {
+        Some(self.v1()?.max_size_of_instructions.get())
     }
-    pub const fn max_component_elements(&self) -> Option<uint16> {
-        Some(self.v1()?.max_component_elements)
+    pub const fn max_component_elements(&self) -> Option<u16> {
+        Some(self.v1()?.max_component_elements.get())
     }
-    pub const fn max_component_depth(&self) -> Option<uint16> {
-        Some(self.v1()?.max_component_depth)
+    pub const fn max_component_depth(&self) -> Option<u16> {
+        Some(self.v1()?.max_component_depth.get())
     }
 }
 
