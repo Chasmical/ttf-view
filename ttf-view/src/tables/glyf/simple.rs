@@ -1,6 +1,7 @@
 use crate::{
     tables::glyf::Glyph,
     types::{int16, uint16},
+    util::{Check, Cursor, Unchecked},
 };
 use std::ptr::NonNull;
 
@@ -27,17 +28,28 @@ impl SimpleGlyph {
         let len = self.number_of_contours.get() as usize;
         unsafe { std::slice::from_raw_parts(self.end_pts_of_contours.as_ptr(), len) }
     }
+    pub const fn total_point_count(&self) -> u32 {
+        // TODO: When closures are constified, replace this with Option::map_or
+        match self.end_pts_of_contours().last() {
+            Some(last_idx) => last_idx.get() as u32 + 1,
+            None => 0,
+        }
+    }
     pub const fn instruction_length(&self) -> uint16 {
         unsafe { *self.end_pts_of_contours().as_ptr_range().end }
     }
     pub const fn instructions(&self) -> &[u8] {
         let len_ptr = self.end_pts_of_contours().as_ptr_range().end;
-        let len = unsafe { *len_ptr }.get() as usize;
+        let len = unsafe { &*len_ptr }.get() as usize;
         unsafe { std::slice::from_raw_parts(len_ptr.byte_add(2).cast(), len) }
     }
     pub const fn flags_ptr(&self) -> NonNull<PointFlags> {
-        let ptr = self.instructions().as_ptr_range().end.cast_mut();
-        unsafe { NonNull::new_unchecked(ptr.cast()) }
+        let ptr = self.instructions().as_ptr_range().end;
+        NonNull::from_ref(unsafe { &*ptr.cast() })
+    }
+
+    pub fn contours(&self) -> ContoursIter<'_> {
+        ContoursIter::new(self)
     }
 }
 
@@ -51,7 +63,7 @@ bitflags::bitflags! {
         const X_IS_SAME_OR_POS = 0x10;
         const Y_IS_SAME_OR_POS = 0x20;
         const OVERLAP_SIMPLE = 0x40;
-        const RESERVED = 0x80;
+        // const RESERVED = 0x80;
     }
 }
 
@@ -65,7 +77,7 @@ impl PointFlags {
     pub const fn is_y_short(&self) -> bool {
         self.intersects(Self::Y_IS_SHORT)
     }
-    pub const fn is_repeating(&self) -> bool {
+    pub const fn is_repeated(&self) -> bool {
         self.intersects(Self::REPEAT_FLAG)
     }
     pub const fn is_x_same_or_pos(&self) -> bool {
@@ -83,160 +95,246 @@ pub struct Point {
     pub dy: i16,
 }
 
-/// PointsIter<'a> will iterate through all flags, and parse the points.
-///
-/// Flags need to be read until we get past (last end point index + 1)
-pub struct PointsIter<'a> {
-    end_points_of_contours: NonNull<uint16>,
-    number_of_contours: u16,
-    point_index: u16,
-    repeat_flag: PointFlags,
-    repeat_count: u8,
-    flags_ptr: NonNull<PointFlags>,
-    x_coords: NonNull<()>,
-    y_coords: NonNull<()>,
-    _phantom: std::marker::PhantomData<&'a ()>,
+impl Point {
+    pub const fn on_curve(&self) -> bool {
+        self.flags.on_curve()
+    }
 }
 
-fn find_lengths(mut ptr: NonNull<PointFlags>, mut points_left: u32) -> (u32, u32, u32) {
-    let started_from = ptr;
-    let mut xs_len = 0;
-    let mut ys_len = 0;
+/// This function calculates the lengths of variable-length arrays (flags, x_coords, y_coords),
+/// reading up to specified number of logical points. Here's some cases to better understand this:
+///
+/// ```text
+/// Flags: (short_x | long_y)
+/// - Read 1 flags byte, a short (1-byte) X coord, and a long (2-byte) Y coord. 1 logical point.
+///
+/// Flags: (repeat | long_x | same_y) (5)
+///   Read 2 flags bytes, 5 long X coords, and NO Y coords (they're zero). 5 logical points.
+///
+/// Flags: (repeat | short_x | short_y) (20)
+/// - Read 2 flags bytes, 20 short X coords and 20 short Y coords. 20 logical points.
+/// ```
+///
+/// TODO: Passing old state and returning new state is a bit of an antipattern...
+/// I should maybe probably move this to a method on ContoursIter?
+pub(super) fn process_contour_data<C: Check>(
+    mut cursor: Cursor<'_, PointFlags, C>,
+    mut points_to_read: u32,
+    mut xs_len: u32,
+    mut ys_len: u32,
+) -> Result<(u32, u32, u32, PointFlags, u8), C::Err> {
+    let started_from = cursor.as_non_null();
 
-    while points_left > 0 {
-        let flag = unsafe { ptr.read() };
-        unsafe { ptr = ptr.byte_add(1) };
+    // Number of points can't exceed 65536 (65535 is max possible index in end_pts_of_contours),
+    // and maximum value of xs_len/ys_len is twice that (131072) and need to be stored in u32.
+    let mut flags = PointFlags::empty();
+    let mut extra_count = 0;
 
-        let count = if flag.is_repeating() {
-            unsafe {
-                let repeats = ptr.read().bits();
-                ptr = ptr.byte_add(1);
-                1 + repeats as u32
-            }
-        } else {
-            1
-        };
+    // Read flags with cursor until we've read all the logical points we need
+    while points_to_read > 0 {
+        flags = cursor.read()?;
 
-        points_left = points_left.saturating_sub(count);
+        // Calculate the amount of logical flags (just one, or repeated N times)
+        let repeated_count = if flags.is_repeated() { 1 + cursor.read()?.bits() as u32 } else { 1 };
 
-        // | short | same_or_pos | value | size |
-        // |-------|-------------|-------|------|
-        // | 0 | 0 | int16 | 2 |
-        // | 0 | 1 | 0     | 0 |
-        // | 1 | 0 | - u8  | 1 |
-        // | 1 | 1 | + u8  | 1 |
+        // If a repeated flags byte crosses to the next contour, we'll need to store and return the
+        // amount of extra repeats of these flags, that should be carried over to the next contour.
+        let actual_count = repeated_count.min(points_to_read);
+        if repeated_count > actual_count {
+            extra_count = (repeated_count - actual_count) as u8;
+        }
+        points_to_read -= actual_count;
 
-        xs_len += flag.is_x_short() as u32 * count;
-        const X_FLAGS: PointFlags = PointFlags::X_IS_SHORT.union(PointFlags::X_IS_SAME_OR_POS);
-        xs_len += !flag.intersects(X_FLAGS) as u32 * count * 2;
-
-        ys_len += flag.is_y_short() as u32 * count;
-        const Y_FLAGS: PointFlags = PointFlags::Y_IS_SHORT.union(PointFlags::Y_IS_SAME_OR_POS);
-        ys_len += !flag.intersects(Y_FLAGS) as u32 * count * 2;
+        // Add how many bytes the X and Y coordinates with these flags would occupy
+        xs_len += calc_xs_len(flags, actual_count);
+        ys_len += calc_ys_len(flags, actual_count);
     }
 
-    let flags_len = unsafe { ptr.offset_from_unsigned(started_from) } as u32;
-    (flags_len, xs_len, ys_len)
+    // Calculate how many flags were read
+    let flags_len = cursor.offset_from(started_from) as u32;
+
+    Ok((flags_len, xs_len, ys_len, flags, extra_count))
 }
 
-impl<'a> PointsIter<'a> {
+fn calc_xs_len(flags: PointFlags, actual_count: u32) -> u32 {
+    // Legend: f=flags, A=f&2 (short), B=f&16 (same_or_pos), C=f&18 (both).
+    //
+    // | X type   | | A |A=0|A≠0| |B=0|B≠0| |C=0|C≠0|C=2|C≠2|C=16|C≠16|C=18|C≠18| |sum|
+    // |----------| |---|---|---| |---|---| |---|---|---|---|----|----|----|----| |---|
+    // | long   0 | | 0 | 1 | 0 | | 1 | 0 | | 1 | 0 | 0 | 1 | 0  | 1  | 0  | 1  | | 2 |
+    // | -byte  2 | | 0 | 1 | 0 | | 0 | 1 | | 0 | 1 | 1 | 0 | 0  | 1  | 0  | 1  | | 1 |
+    // | zero  16 | | 2 | 0 | 1 | | 1 | 0 | | 0 | 1 | 0 | 1 | 1  | 0  | 0  | 1  | | 0 |
+    // | +byte 18 | | 2 | 0 | 1 | | 0 | 1 | | 0 | 1 | 0 | 1 | 0  | 1  | 1  | 0  | | 1 |
+    //                                        ^                    ^
+    // (C=0)+(C≠16) appears to be the simplest solution.
+    // This solution works for Y too (just different bitmasks).
+
+    let c = flags.intersection(PointFlags::X_IS_SHORT.union(PointFlags::X_IS_SAME_OR_POS));
+    (c.is_empty() as u32 + (c != PointFlags::X_IS_SAME_OR_POS) as u32) * actual_count
+}
+fn calc_ys_len(flags: PointFlags, actual_count: u32) -> u32 {
+    let c = flags.intersection(PointFlags::Y_IS_SHORT.union(PointFlags::Y_IS_SAME_OR_POS));
+    (c.is_empty() as u32 + (c != PointFlags::Y_IS_SAME_OR_POS) as u32) * actual_count
+}
+
+#[derive(Clone)]
+pub struct ContoursIter<'a> {
+    end_points: std::slice::Iter<'a, uint16>,
+    flags: Cursor<'a, PointFlags, Unchecked>,
+    x_coords: Cursor<'a, u8, Unchecked>,
+    y_coords: Cursor<'a, u8, Unchecked>,
+    prev_end_point: u16,
+    prev_repeat_flags: PointFlags,
+    prev_repeat_count: u8,
+}
+
+impl<'a> ContoursIter<'a> {
     pub fn new(glyph: &'a SimpleGlyph) -> Self {
-        let flags_ptr = glyph.flags_ptr();
-        let points_count = glyph.end_pts_of_contours().last().map_or(0, |x| x.get() as u32) + 1;
-        let (flags_len, xs_len, _ys_len) = find_lengths(flags_ptr, points_count);
+        let flags = Cursor::new_at(glyph.flags_ptr());
+
+        let end_points = glyph.end_pts_of_contours();
+        let points_count = glyph.total_point_count();
+
+        // We'll use Cursor<'_, _, Unchecked> to read the flags array, since the SimpleGlyph
+        // is guaranteed to be well-formed, thanks to Glyf::new_in's validation.
+        let data = process_contour_data(flags.clone(), points_count, 0, 0).unwrap();
+        let (flags_len, xs_len, _ys_len, _, extra_count) = data;
+
+        // We just calculated the sizes of the arrays, so we don't need the extra repeat flags,
+        // but it definitely should be 0 if everything works as it should (just a sanity check).
+        debug_assert!(extra_count == 0);
+
+        // Create Cursor<'_, _, Unchecked>s for the coordinates
+        let x_coords = flags.offset_cast(flags_len as usize);
+        let y_coords = x_coords.offset_cast(xs_len as usize);
 
         Self {
-            end_points_of_contours: NonNull::from_ref(&glyph.end_pts_of_contours).cast(),
-            number_of_contours: glyph.number_of_contours.get() as u16,
-            point_index: 0,
-            repeat_flag: PointFlags::default(),
-            repeat_count: 0,
-            flags_ptr,
-            x_coords: unsafe { flags_ptr.byte_add(flags_len as _).cast() },
-            y_coords: unsafe { flags_ptr.byte_add((flags_len + xs_len) as _).cast() },
-            _phantom: Default::default(),
+            end_points: end_points.iter(),
+            flags,
+            x_coords,
+            y_coords,
+            prev_end_point: 0,
+            prev_repeat_flags: PointFlags::empty(),
+            prev_repeat_count: 0,
         }
     }
-    pub const fn end_points_of_contours(&self) -> &[uint16] {
-        let len = self.number_of_contours as usize;
-        unsafe { std::slice::from_raw_parts(self.end_points_of_contours.as_ptr(), len) }
-    }
-    pub fn contour_index(&self, point_index: u16) -> Option<u16> {
-        self.end_points_of_contours().iter().position(|x| *x >= point_index).map(|x| x as u16)
-    }
 }
 
-impl<'a> Iterator for PointsIter<'a> {
-    type Item = (u16, Point);
+impl<'a> Iterator for ContoursIter<'a> {
+    type Item = Contour<'a>;
     fn next(&mut self) -> Option<Self::Item> {
-        let flag = unsafe {
-            if self.repeat_count != 0 {
-                self.repeat_count -= 1;
-                self.repeat_flag
-            } else {
-                let next = self.flags_ptr.read();
-                self.flags_ptr = self.flags_ptr.byte_add(1);
-                if next.is_repeating() {
-                    self.repeat_flag = next;
-                    self.repeat_count = self.flags_ptr.read().bits();
-                    self.flags_ptr = self.flags_ptr.byte_add(1);
-                }
-                next
-            }
+        // Read the next point, and calculate the amount of points in this contour
+        let end_point = self.end_points.next()?.get();
+        let points_count = (end_point - self.prev_end_point) as u32 + 1;
+        self.prev_end_point = end_point;
+
+        // Check how many flags bytes are still "in the buffer" from the last repeated flags,
+        // and calculate the lengths of the corresponding X and Y coordinates.
+        let remained_from_previous = (self.prev_repeat_count as u32).min(points_count);
+        let xs_len = calc_xs_len(self.prev_repeat_flags, remained_from_previous);
+        let ys_len = calc_ys_len(self.prev_repeat_flags, remained_from_previous);
+        self.prev_repeat_count -= remained_from_previous as u8;
+
+        // Read however many logical points we need to "complete" this contour. Could be zero,
+        // meaning that we shouldn't override the prev_repeat_flags/prev_repeat_count with the
+        // values we get here just yet - those repeated flags are still not exhausted.
+        let to_read = points_count - remained_from_previous;
+        let data = process_contour_data(self.flags.clone(), to_read, xs_len, ys_len).unwrap();
+        let (flags_len, xs_len, ys_len, repeat_flags, repeat_count) = data;
+
+        let contour = Contour {
+            flags: self.flags.clone(),
+            x_coords: self.x_coords.clone(),
+            y_coords: self.y_coords.clone(),
+            points_left: points_count,
+            // Contour will return `remained_from_previous` points with the last repeated flags,
+            // before moving on to the points with flags dedicated to this current contour.
+            repeat_count: remained_from_previous as u8,
+            cur_flags: self.prev_repeat_flags,
         };
 
-        use PointFlags as PF;
-        // | short | same_or_pos | value | size |
-        // |-------|-------------|-------|------|
-        // | 0 | 0 | int16 | 2 |
-        // | 0 | 1 | 0     | 0 |
-        // | 1 | 0 | - u8  | 1 |
-        // | 1 | 1 | + u8  | 1 |
+        // If the repeat_count we got from process_contour_data is not zero, that means we actually
+        // got to read some flags, meaning that the last repeated flags were exhausted. So we need
+        // to replace the old repeated flags with the new ones.
+        if repeat_count > 0 {
+            self.prev_repeat_flags = repeat_flags;
+            self.prev_repeat_count = repeat_count;
+        }
 
-        let dx = unsafe {
-            match (flag.intersects(PF::X_IS_SHORT), flag.intersects(PF::X_IS_SAME_OR_POS)) {
-                (false, false) => {
-                    let dx = self.x_coords.cast::<int16>().as_ref().get();
-                    self.x_coords = self.x_coords.byte_add(2);
-                    dx
-                },
-                (false, true) => 0,
-                (true, false) => {
-                    let dx = self.x_coords.cast::<u8>().read();
-                    self.x_coords = self.x_coords.byte_add(1);
-                    -(dx as i16)
-                },
-                (true, true) => {
-                    let dx = self.x_coords.cast::<u8>().read();
-                    self.x_coords = self.x_coords.byte_add(1);
-                    dx as i16
-                },
-            }
-        };
-        let dy = unsafe {
-            match (flag.intersects(PF::Y_IS_SHORT), flag.intersects(PF::Y_IS_SAME_OR_POS)) {
-                (false, false) => {
-                    let dy = self.y_coords.cast::<int16>().as_ref().get();
-                    self.y_coords = self.y_coords.byte_add(2);
-                    dy
-                },
-                (false, true) => 0,
-                (true, false) => {
-                    let dy = self.y_coords.cast::<u8>().read();
-                    self.y_coords = self.y_coords.byte_add(1);
-                    -(dy as i16)
-                },
-                (true, true) => {
-                    let dy = self.y_coords.cast::<u8>().read();
-                    self.y_coords = self.y_coords.byte_add(1);
-                    dy as i16
-                },
-            }
-        };
+        // Advance to the starting points of the next contour
+        self.flags.advance_by_bytes(flags_len as usize);
+        self.x_coords.advance_by_bytes(xs_len as usize);
+        self.y_coords.advance_by_bytes(ys_len as usize);
 
-        let idx = self.point_index;
-        self.point_index = self.point_index.wrapping_add(1);
-
-        Some((idx, Point { flags: flag, dx, dy }))
+        // Return the contour we've just read
+        Some(contour)
     }
 }
+impl<'a> ExactSizeIterator for ContoursIter<'a> {
+    fn len(&self) -> usize {
+        self.end_points.len()
+    }
+}
+impl<'a> std::iter::FusedIterator for ContoursIter<'a> {}
+
+#[derive(Clone)]
+pub struct Contour<'a> {
+    flags: Cursor<'a, PointFlags, Unchecked>,
+    x_coords: Cursor<'a, u8, Unchecked>,
+    y_coords: Cursor<'a, u8, Unchecked>,
+    points_left: u32,
+    cur_flags: PointFlags,
+    repeat_count: u8,
+}
+
+impl<'a> Iterator for Contour<'a> {
+    type Item = Point;
+    fn next(&mut self) -> Option<Self::Item> {
+        // We need to keep track of how many points are left, so that we don't accidentally
+        // return the next contour's points with the repeated flags at the end of this one.
+        self.points_left = self.points_left.checked_sub(1)?;
+
+        // If we're currently repeating flags, decrement the counter and use the repeated value
+        if self.repeat_count > 0 {
+            self.repeat_count -= 1;
+        } else {
+            // Otherwise, read the next flags, and set the repeat counter if flags are repeated
+            self.cur_flags = self.flags.read().unwrap();
+            if self.cur_flags.is_repeated() {
+                self.repeat_count = self.flags.read().unwrap().bits();
+            }
+        }
+
+        // TODO: Will this really be better than just some conditions?
+
+        let dx = match calc_xs_len(self.cur_flags, 1) {
+            0 => 0,
+            1 => {
+                let byte = self.x_coords.read().unwrap() as i16;
+                if self.cur_flags.is_x_same_or_pos() { byte } else { -byte }
+            },
+            2 => self.x_coords.read_as::<int16>().unwrap().get(),
+            // Hopefully Rust realizes that the sum of two bools can't be more than 2
+            _ => unreachable!(),
+        };
+
+        let dy = match calc_ys_len(self.cur_flags, 1) {
+            0 => 0,
+            1 => {
+                let byte = self.y_coords.read().unwrap() as i16;
+                if self.cur_flags.is_y_same_or_pos() { byte } else { -byte }
+            },
+            2 => self.y_coords.read_as::<int16>().unwrap().get(),
+            // Hopefully Rust realizes that the sum of two bools can't be more than 2
+            _ => unreachable!(),
+        };
+
+        Some(Point { flags: self.cur_flags, dx, dy })
+    }
+}
+impl<'a> ExactSizeIterator for Contour<'a> {
+    fn len(&self) -> usize {
+        self.points_left as usize
+    }
+}
+impl<'a> std::iter::FusedIterator for Contour<'a> {}

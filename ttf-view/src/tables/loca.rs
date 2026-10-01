@@ -72,7 +72,7 @@ impl<'a> Table<'a> for Loca<'a> {
         let loca = Self { ptr, num_glyphs, format, _phantom: Default::default() };
 
         if !loca.iter_raw().is_sorted() {
-            return Err(TableError::Malformed(&"'loca' offsets not in order"));
+            return Err(TableError::Malformed(&"offsets not sorted"));
         }
 
         Ok(loca)
@@ -146,7 +146,8 @@ pub struct Iter<'a> {
 impl<'a> Iter<'a> {
     pub fn new(loca: Loca<'a>) -> Self {
         let mut inner = RawIter::new(loca);
-        let first = inner.next().unwrap();
+        // loca is guaranteed to have at least one offset (see Loca::new_in)
+        let first = inner.next().unwrap_or(0);
         Self { inner, glyph_id: 0, prev: first }
     }
 }
@@ -156,12 +157,14 @@ impl<'a> Iterator for Iter<'a> {
         let next = self.inner.next()?;
         let ret = (self.glyph_id.into(), self.prev..next);
         self.prev = next;
+        // GlyphId(65535) is the last glyph, so it's okay to wrap here
         self.glyph_id = self.glyph_id.wrapping_add(1);
         Some(ret)
     }
     fn advance_by(&mut self, n: usize) -> Result<(), NonZero<usize>> {
         let advance = self.len().min(n);
         if advance > 0 {
+            // Read the offset before the one we're advancing to
             self.prev = self.inner.nth(advance - 1).unwrap();
         }
         NonZero::new(n - advance).map_or(Ok(()), Err)
@@ -199,6 +202,7 @@ impl<'a> ExactSizeIterator for Iter<'a> {
         self.inner.len()
     }
 }
+impl<'a> std::iter::FusedIterator for Iter<'a> {}
 
 impl std::fmt::Debug for Loca<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

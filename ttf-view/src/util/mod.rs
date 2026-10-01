@@ -1,7 +1,9 @@
+mod cursor;
 mod custom_iter;
 mod display_buffer;
 mod packed_dual_iter;
 
+pub(crate) use cursor::*;
 pub(crate) use custom_iter::*;
 pub(crate) use display_buffer::*;
 pub(crate) use packed_dual_iter::*;

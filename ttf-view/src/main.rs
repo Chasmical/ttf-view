@@ -229,7 +229,7 @@ implement_tables!(dir {
     tags::fvar, "Font Variations Table"; // dir.fvar() => fvar::Fvar;
     tags::gasp, "Grid-fitting and Scan-conversion"; // dir.gasp() => gasp::Gasp;
     tags::GDEF, "Glyph Definition Table"; // dir.gdef() => gdef::Gdef;
-    tags::glyf, "Glyph Data Table"; // dir.glyf() => glyf::Glyf;
+    tags::glyf, "Glyph Data Table", dir.glyf() => glyf::Glyf;
     tags::GPOS, "Glyph Positioning Table"; // dir.gpos() => gpos::Gpos;
     tags::GSUB, "Glyph Substitution Table"; // dir.gsub() => gsub::Gsub;
     tags::gvar, "Glyph Variations Table"; // dir.gvar() => gvar::Gvar;
