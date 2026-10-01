@@ -10,6 +10,7 @@ pub mod hhea;
 pub mod hmtx;
 pub mod loca;
 pub mod maxp;
+pub mod meta;
 pub mod name;
 pub mod os_2;
 
@@ -34,6 +35,9 @@ impl TableDirectory {
         self.table()
     }
     pub fn maxp(&self) -> Result<maxp::Maxp<'_>, TableError> {
+        self.table()
+    }
+    pub fn meta(&self) -> Result<meta::Meta<'_>, TableError> {
         self.table()
     }
     pub fn name(&self) -> Result<name::Name<'_>, TableError> {

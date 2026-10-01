@@ -131,20 +131,28 @@ impl Tag {
 }
 
 macro_rules! define_known_tags {
-    ( $($tag:ident $(= $s:expr)?),* $(,)? ) => {
+    (
+        tables { $($tag:ident $(= $s:expr)?),* $(,)? }
+        metadata { $($meta_tag:ident $(= $s2:expr)?),* $(,)? }
+    ) => {
         impl Tag {
             /// An array of all known OpenType tags, collected from Microsoft's OpenType spec.
             ///
             /// Its contents and order may and probably will change in the future.
             pub const KNOWN_TAGS: &[Tag] = &[ $( tags::$tag, )* ];
+            /// An array of known metadata tags, used in the [`'meta'`][crate::tables::meta] table.
+            ///
+            /// Its contents and order may and probably will change in the future.
+            pub const KNOWN_META_TAGS: &[Tag] = &[ $(tags::$meta_tag,)* ];
 
-            /// Checks if this tag is a known OpenType tag ([`Tag::KNOWN_TAGS`]).
+            /// Checks if this tag is a known OpenType table tag ([`Tag::KNOWN_TAGS`]).
             ///
             /// ```
             /// use ttf_view::types::{Tag, tags};
             ///
-            /// // All tags in the `tags` module are known
-            /// assert_eq!(tags::name.is_known(), true);
+            /// // Not all tags in the `tags` module are for tables
+            /// assert_eq!(tags::glyf.is_known(), true); // 'glyf' table
+            /// assert_eq!(tags::dlng.is_known(), false); // 'dlng' script lang tag used in metadata
             /// assert_eq!(Tag::from_str("name").unwrap().is_known(), true);
             /// assert_eq!(Tag::from_str("XXXX").unwrap().is_known(), false);
             /// ```
@@ -158,6 +166,7 @@ macro_rules! define_known_tags {
             use super::Tag;
 
             $( pub const $tag: Tag = Tag::from_str(define_known_tags!(@value $tag $(= $s)?)).ok().unwrap(); )*
+            $( pub const $meta_tag: Tag = Tag::from_str(define_known_tags!(@value $meta_tag $(= $s2)?)).ok().unwrap(); )*
         }
     };
     (@value $tag:ident) => (stringify!($tag));
@@ -165,10 +174,15 @@ macro_rules! define_known_tags {
 }
 
 define_known_tags! {
-    avar, BASE, CBDT, CBLC, CFF, CFF2, cmap, COLR, CPAL, cvar, cvt, DSIG, EBDT, EBLC, EBSC, fpgm,
-    fvar, gasp, GDEF, glyf, GPOS, GSUB, gvar, hdmx, head, hhea, hmtx, HVAR, JSTF, kern, loca, LTSH,
-    MATH, maxp, MERG, meta, MVAR, name, OS_2 = "OS/2", PCLT, post, prep, sbix, STAT, SVG, VDMX,
-    vhea, vmtx, VORG, VVAR,
+    tables {
+        avar, BASE, CBDT, CBLC, CFF, CFF2, cmap, COLR, CPAL, cvar, cvt, DSIG, EBDT, EBLC, EBSC,
+        fpgm, fvar, gasp, GDEF, glyf, GPOS, GSUB, gvar, hdmx, head, hhea, hmtx, HVAR, JSTF, kern,
+        loca, LTSH, MATH, maxp, MERG, meta, MVAR, name, OS_2 = "OS/2", PCLT, post, prep, sbix, STAT,
+        SVG, VDMX, vhea, vmtx, VORG, VVAR,
+    }
+    metadata {
+        dlng, slng,
+    }
 }
 
 /// Formats the tag's value surrounded by apostrophes: e.g. `'COLR'`, `'cvt '`, `'glyf'`.

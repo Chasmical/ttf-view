@@ -245,7 +245,7 @@ implement_tables!(dir {
     tags::MATH, "Mathematical Typesetting Table"; // dir.math() => math::Math;
     tags::maxp, "Maximum Profile", dir.maxp() => maxp::Maxp;
     tags::MERG, "Merge Table"; // dir.merg() => merg::Merg;
-    tags::meta, "Metadata Table"; // dir.meta() => meta::Meta;
+    tags::meta, "Metadata Table", dir.meta() => meta::Meta;
     tags::MVAR, "Metrics Variations Table"; // dir.mvar() => mvar::Mvar;
     tags::name, "Naming Table", dir.name() => name::Name;
     tags::OS_2, "OS/2 and Windows Metrics Table", dir.os_2() => os_2::Os_2;
