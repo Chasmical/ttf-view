@@ -31,6 +31,7 @@ const impl std::ops::Deref for NameV1 {
 
 #[repr(C)]
 pub struct NameRecordRaw {
+    _exhaustive_but_dont_instantiate: (),
     pub platform_id: BigEndian<PlatformId>,
     pub encoding_id: uint16,
     pub language_id: uint16,
@@ -40,6 +41,7 @@ pub struct NameRecordRaw {
 }
 #[repr(C)]
 pub struct LangTagRecordRaw {
+    _exhaustive_but_dont_instantiate: (),
     pub length: uint16,
     pub lang_tag_offset: Offset16,
 }

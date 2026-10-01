@@ -16,6 +16,7 @@ struct HmtxRaw {
 
 #[repr(C)]
 pub struct LongHorMetricRaw {
+    _exhaustive_but_dont_instantiate: (),
     pub advance_width: UFWORD,
     pub lsb: FWORD,
 }

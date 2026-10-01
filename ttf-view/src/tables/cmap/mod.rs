@@ -33,6 +33,7 @@ pub struct CmapV0 {
 }
 #[repr(C)]
 pub struct EncodingRecordRaw {
+    _exhaustive_but_dont_instantiate: (),
     pub platform_id: BigEndian<PlatformId>,
     pub encoding_id: uint16,
     pub subtable_offset: Offset32,
