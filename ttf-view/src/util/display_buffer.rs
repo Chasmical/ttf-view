@@ -29,12 +29,34 @@ impl<const N: usize> DisplayBuffer<N> {
         self.pos += 1;
     }
     #[inline]
+    pub fn overwrite_last_byte_unchecked(&mut self, byte: u8) {
+        debug_assert!(self.pos > 0);
+        self.pos -= 1;
+        self.write_byte_unchecked(byte);
+    }
+
+    #[inline]
     pub fn write_two_digits_unchecked(&mut self, num: u8) {
         debug_assert!(self.pos + 2 <= N && num < 100);
 
         let dst = unsafe { self.buf.get_unchecked_mut(self.pos..self.pos + 2) };
         dst.write_copy_of_slice(&[b'0' + num / 10, b'0' + num % 10]);
         self.pos += 2;
+    }
+    #[inline]
+    pub fn write_number_u8_unchecked(&mut self, mut num: u8) {
+        let hundreds = num / 100;
+        num %= 100;
+        let tens = num / 10;
+        num %= 10;
+
+        if hundreds != 0 {
+            self.write_byte_unchecked(b'0' + hundreds);
+        }
+        if hundreds != 0 || tens != 0 {
+            self.write_byte_unchecked(b'0' + tens);
+        }
+        self.write_byte_unchecked(b'0' + num);
     }
 
     pub const fn as_str(&self) -> &str {

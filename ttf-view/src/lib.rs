@@ -55,9 +55,9 @@
 //! let os_2: Os_2<'_> = dir.os_2().unwrap();
 //! println!("Vendor ID: {}", os_2.ach_vend_id); // a field in Os_2Base
 //!
-//! if let Some(v4) = os_2.v4() { // v4 is &Os_2V4
-//!     println!("Last char idx: {}", v4.us_last_char_index); // a field in Os_2Base
-//!     println!("Default char: {}", v4.us_default_char); // a field in Os_2V4
+//! if let Some(v2) = os_2.v2() { // v2 is &Os_2V2
+//!     println!("Last char idx: {}", v2.us_last_char_index); // a field in Os_2Base
+//!     println!("Default char: {}", v2.us_default_char); // a field in Os_2V2
 //! }
 //! ```
 //!
