@@ -109,7 +109,7 @@ const impl std::ops::Deref for Os_2V5 {
 
 impl<'a> Table<'a> for Os_2<'a> {
     const TAG: Tag = tags::OS_2;
-    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+    fn new_in(dir: TableDirectory<'a>) -> Result<Self, TableError> {
         let rec = dir.table_record(tags::OS_2).ok_or(TableError::NotFound)?;
         let base = rec.raw_as::<Os_2Base>().ok_or(TableError::InvalidLen)?;
 

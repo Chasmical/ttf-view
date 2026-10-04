@@ -134,7 +134,7 @@ const DIR_TAG: Tag = if let Ok(tag) = Tag::from_str("dir") { tag } else { unreac
 // This macro constructs the dump() fn, and the supported formats table.
 macro_rules! implement_tables {
     ($dir:ident { $( $tag:path, $name:expr $(, $get_table:expr => $Table:ty)? );* $(;)? }) => {
-        fn dump($dir: &TableDirectory, tag: Option<Tag>, format: Format) {
+        fn dump($dir: TableDirectory, tag: Option<Tag>, format: Format) {
             // Binary format should always work for any tables
             if format == Format::Binary {
                 let bytes = match tag {
@@ -148,8 +148,8 @@ macro_rules! implement_tables {
 
             // Get the table with its vtable (see DumpDebug trait at the end of the file)
             let table: &dyn DumpDebug = match tag {
-                None => $dir,
-                Some(DIR_TAG) if $dir.table_record_raw(DIR_TAG).is_none() => $dir,
+                None => &$dir,
+                Some(DIR_TAG) if $dir.table_record_raw(DIR_TAG).is_none() => &$dir,
 
                 $($( Some($tag) => &$get_table.expect("Table should be well-formed"), )?)*
 
@@ -290,7 +290,7 @@ The project's GitHub repository: https://github.com/Chasmical/ttf-view
     );
 }
 
-fn print_tables(dir: Option<&TableDirectory>) {
+fn print_tables(dir: Option<TableDirectory>) {
     if dir.is_some() {
         println!("The specified font contains the following tables:");
     } else {

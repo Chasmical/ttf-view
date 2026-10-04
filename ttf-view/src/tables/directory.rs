@@ -5,7 +5,7 @@ use crate::{
 };
 
 #[repr(C)]
-pub struct TableDirectory {
+pub struct TableDirectoryRaw {
     pub sfnt_version: uint32,
     pub num_tables: uint16,
     pub search_range: uint16,
@@ -22,16 +22,45 @@ pub struct TableRecordRaw {
     pub length: uint32,
 }
 
-impl TableDirectory {
-    pub fn new(bytes: &[u8]) -> Result<&Self, TableError> {
+#[derive(Copy)]
+#[derive_const(Clone)]
+pub struct TableDirectory<'a> {
+    dir: &'a TableDirectoryRaw,
+}
+
+const impl<'a> std::ops::Deref for TableDirectory<'a> {
+    type Target = &'a TableDirectoryRaw;
+    fn deref(&self) -> &Self::Target {
+        &self.dir
+    }
+}
+
+impl TableDirectoryRaw {
+    pub const fn table_records_raw(&self) -> &[TableRecordRaw] {
+        let len = self.num_tables.get() as usize;
+        unsafe { std::slice::from_raw_parts(self.table_records.as_ptr(), len) }
+    }
+    pub fn table_record_raw(&self, tag: Tag) -> Option<&TableRecordRaw> {
+        self.table_records_raw().iter().find(|x| x.table_tag == tag)
+    }
+
+    // TODO: probably will remove later
+    pub const fn directory_as_bytes(&self) -> &[u8] {
+        let size = size_of::<TableDirectoryRaw>() + size_of_val(self.table_records_raw());
+        unsafe { std::slice::from_raw_parts(std::ptr::from_ref(self).cast(), size) }
+    }
+}
+
+impl<'a> TableDirectory<'a> {
+    pub fn new(bytes: &'a [u8]) -> Result<Self, TableError> {
         // Validate that table directory is in range
-        if bytes.len() < size_of::<TableDirectory>() {
+        if bytes.len() < size_of::<TableDirectoryRaw>() {
             return Err(TableError::InvalidLen);
         }
-        let dir = unsafe { Self::new_unchecked(bytes) };
+        let dir = unsafe { &*bytes.as_ptr().cast::<TableDirectoryRaw>() };
 
         // Validate that all table records are in range
-        let required_len = size_of::<TableDirectory>()
+        let required_len = size_of::<TableDirectoryRaw>()
             + dir.num_tables.get() as usize * size_of::<TableRecordRaw>();
         if bytes.len() < required_len {
             return Err(TableError::InvalidLen);
@@ -45,34 +74,21 @@ impl TableDirectory {
             }
         }
 
-        Ok(dir)
+        Ok(Self { dir })
     }
-    pub const unsafe fn new_unchecked(bytes: &[u8]) -> &Self {
-        unsafe { &*bytes.as_ptr().cast() }
-    }
-
-    pub const fn directory_as_bytes(&self) -> &[u8] {
-        let size = size_of::<Self>() + size_of_val(self.table_records_raw());
-        unsafe { std::slice::from_raw_parts(std::ptr::from_ref(self).cast(), size) }
+    pub const unsafe fn new_unchecked(bytes: &'a [u8]) -> Self {
+        Self { dir: unsafe { &*bytes.as_ptr().cast() } }
     }
 
-    pub const fn table_records_raw(&self) -> &[TableRecordRaw] {
-        let len = self.num_tables.get() as usize;
-        unsafe { std::slice::from_raw_parts(self.table_records.as_ptr(), len) }
+    pub const fn table_records(&self) -> TableRecordsIter<'a> {
+        TableRecordsIter::new(*self)
     }
-    pub fn table_record_raw(&self, tag: Tag) -> Option<&TableRecordRaw> {
-        self.table_records_raw().iter().find(|x| x.table_tag == tag)
-    }
-
-    pub const fn table_records(&self) -> TableRecordsIter<'_> {
-        TableRecordsIter::new(self)
-    }
-    pub fn table_record(&self, tag: Tag) -> Option<TableRecord<'_>> {
-        Some(TableRecord(self, self.table_record_raw(tag)?))
+    pub fn table_record(&self, tag: Tag) -> Option<TableRecord<'a>> {
+        Some(TableRecord(*self, self.table_record_raw(tag)?))
     }
 
-    pub fn table<'a, T: Table<'a>>(&'a self) -> Result<T, TableError> {
-        T::new_in(self)
+    pub fn table<T: Table<'a>>(&self) -> Result<T, TableError> {
+        T::new_in(*self)
     }
 
     // Note: see src/tables/mod.rs for specific table methods
@@ -80,7 +96,7 @@ impl TableDirectory {
 
 #[derive(Copy)]
 #[derive_const(Clone)]
-pub struct TableRecord<'a>(&'a TableDirectory, &'a TableRecordRaw);
+pub struct TableRecord<'a>(TableDirectory<'a>, &'a TableRecordRaw);
 
 const impl<'a> std::ops::Deref for TableRecord<'a> {
     type Target = &'a TableRecordRaw;
@@ -92,7 +108,7 @@ const impl<'a> std::ops::Deref for TableRecord<'a> {
 impl<'a> TableRecord<'a> {
     pub const fn table_as_bytes(&self) -> &'a [u8] {
         unsafe {
-            let start = std::ptr::from_ref(self.0).cast::<u8>().add(self.offset.get() as _);
+            let start = std::ptr::from_ref(self.0.dir).cast::<u8>().add(self.offset.get() as _);
             std::slice::from_raw_parts(start, self.length.get() as _)
         }
     }
@@ -134,11 +150,11 @@ impl<'a> TableRecord<'a> {
 // TODO: When std::slice::Iter's Clone is constified, make the derive const
 #[derive(Clone)]
 pub struct TableRecordsIter<'a> {
-    dir: &'a TableDirectory,
+    dir: TableDirectory<'a>,
     inner: std::slice::Iter<'a, TableRecordRaw>,
 }
 impl<'a> TableRecordsIter<'a> {
-    pub const fn new(dir: &'a TableDirectory) -> Self {
+    pub const fn new(dir: TableDirectory<'a>) -> Self {
         Self { dir, inner: dir.table_records_raw().iter() }
     }
     // TODO: When std::slice::Iter's as_slice() is constified, constify as_records()
@@ -151,7 +167,7 @@ custom_iterator!(TableRecordsIter<'a> as this {
     map: |x| TableRecord(this.dir, x);
 });
 
-impl std::fmt::Debug for TableDirectory {
+impl std::fmt::Debug for TableDirectory<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("TableDirectory")
             .field("sfnt_version", fmt_with!("{:#010X}", self.sfnt_version))

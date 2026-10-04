@@ -13,7 +13,7 @@ pub use simple::*;
 
 impl<'a> Table<'a> for Glyf<'a> {
     const TAG: Tag = tags::glyf;
-    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+    fn new_in(dir: TableDirectory<'a>) -> Result<Self, TableError> {
         let rec = dir.table_record(Self::TAG).ok_or(TableError::NotFound)?;
 
         let loca = dir.loca().map_err(|_| TableError::Dependency(tags::loca))?;

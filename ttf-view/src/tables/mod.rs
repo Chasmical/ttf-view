@@ -14,43 +14,43 @@ pub mod meta;
 pub mod name;
 pub mod os_2;
 
-impl TableDirectory {
+impl<'a> TableDirectory<'a> {
     // Note: Even though these tables are required, we'll still use Option here
-    pub fn cmap(&self) -> Result<cmap::Cmap<'_>, TableError> {
+    pub fn cmap(&self) -> Result<cmap::Cmap<'a>, TableError> {
         self.table()
     }
-    pub fn glyf(&self) -> Result<glyf::Glyf<'_>, TableError> {
+    pub fn glyf(&self) -> Result<glyf::Glyf<'a>, TableError> {
         self.table()
     }
-    pub fn head(&self) -> Result<head::Head<'_>, TableError> {
+    pub fn head(&self) -> Result<head::Head<'a>, TableError> {
         self.table()
     }
-    pub fn hhea(&self) -> Result<hhea::Hhea<'_>, TableError> {
+    pub fn hhea(&self) -> Result<hhea::Hhea<'a>, TableError> {
         self.table()
     }
-    pub fn hmtx(&self) -> Result<hmtx::Hmtx<'_>, TableError> {
+    pub fn hmtx(&self) -> Result<hmtx::Hmtx<'a>, TableError> {
         self.table()
     }
-    pub fn loca(&self) -> Result<loca::Loca<'_>, TableError> {
+    pub fn loca(&self) -> Result<loca::Loca<'a>, TableError> {
         self.table()
     }
-    pub fn maxp(&self) -> Result<maxp::Maxp<'_>, TableError> {
+    pub fn maxp(&self) -> Result<maxp::Maxp<'a>, TableError> {
         self.table()
     }
-    pub fn meta(&self) -> Result<meta::Meta<'_>, TableError> {
+    pub fn meta(&self) -> Result<meta::Meta<'a>, TableError> {
         self.table()
     }
-    pub fn name(&self) -> Result<name::Name<'_>, TableError> {
+    pub fn name(&self) -> Result<name::Name<'a>, TableError> {
         self.table()
     }
-    pub fn os_2(&self) -> Result<os_2::Os_2<'_>, TableError> {
+    pub fn os_2(&self) -> Result<os_2::Os_2<'a>, TableError> {
         self.table()
     }
 }
 
 pub trait Table<'a>: Sized {
     const TAG: Tag;
-    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError>;
+    fn new_in(dir: TableDirectory<'a>) -> Result<Self, TableError>;
 }
 
 #[derive(Debug, thiserror::Error)]

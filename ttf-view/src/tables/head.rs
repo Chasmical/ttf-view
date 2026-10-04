@@ -42,7 +42,7 @@ const impl std::ops::Deref for HeadV1 {
 
 impl<'a> Table<'a> for Head<'a> {
     const TAG: Tag = tags::head;
-    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+    fn new_in(dir: TableDirectory<'a>) -> Result<Self, TableError> {
         let rec = dir.table_record(Self::TAG).ok_or(TableError::NotFound)?;
         let v0 = rec.raw_as::<HeadV0>().ok_or(TableError::InvalidLen)?;
 

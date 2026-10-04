@@ -23,7 +23,7 @@ pub struct LongHorMetricRaw {
 
 impl<'a> Table<'a> for Hmtx<'a> {
     const TAG: Tag = tags::hmtx;
-    fn new_in(dir: &'a TableDirectory) -> Result<Self, TableError> {
+    fn new_in(dir: TableDirectory<'a>) -> Result<Self, TableError> {
         let rec = dir.table_record(Self::TAG).ok_or(TableError::NotFound)?;
         let raw_words = rec.raw_as::<HmtxRaw>().unwrap().raw_words.as_ptr();
 
