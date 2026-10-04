@@ -142,12 +142,8 @@ const impl<'a> std::ops::Deref for Name<'a> {
 }
 
 impl<'a> Name<'a> {
-    pub const fn version(&self) -> u16 {
-        self.version.get()
-    }
-
     pub const fn v1(&self) -> Option<&'a NameV1> {
-        if self.version() >= 1 {
+        if self.version.get() >= 1 {
             Some(unsafe { std::mem::transmute::<&NameV0, &NameV1>(self.name) })
         } else {
             None

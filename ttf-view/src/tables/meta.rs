@@ -1,12 +1,9 @@
-use std::bstr::ByteStr;
-
 use crate::{
-    tables::Table,
+    tables::{Table, TableDirectory, TableError},
     types::{Offset32, Tag, tags, uint32},
     util::{custom_iterator, fmt_with},
 };
-
-use super::{TableDirectory, TableError};
+use std::bstr::ByteStr;
 
 #[repr(C)]
 pub struct MetaV0 {
@@ -83,12 +80,8 @@ const impl<'a> std::ops::Deref for Meta<'a> {
 }
 
 impl<'a> Meta<'a> {
-    pub const fn version(&self) -> u32 {
-        self.version.get()
-    }
-
     pub const fn v1(&self) -> Option<&'a MetaV1> {
-        if self.version() >= 1 {
+        if self.version.get() >= 1 {
             Some(unsafe { std::mem::transmute::<&MetaV0, &MetaV1>(self.meta) })
         } else {
             None
@@ -110,10 +103,10 @@ impl<'a> Meta<'a> {
     }
 
     pub fn design_languages(&self) -> Option<ScriptLangTags<'_>> {
-        Some(ScriptLangTags(self.data_map(tags::dlng)?.utf8().ok()?))
+        self.v1()?.design_languages()
     }
     pub fn supported_languages(&self) -> Option<ScriptLangTags<'_>> {
-        Some(ScriptLangTags(self.data_map(tags::slng)?.utf8().ok()?))
+        self.v1()?.supported_languages()
     }
 }
 
@@ -131,6 +124,13 @@ impl MetaV1 {
     }
     pub fn data_map(&self, tag: Tag) -> Option<DataMapRecord<'_>> {
         Some(DataMapRecord(Meta { meta: self }, self.data_map_record(tag)?))
+    }
+
+    pub fn design_languages(&self) -> Option<ScriptLangTags<'_>> {
+        Some(ScriptLangTags(self.data_map(tags::dlng)?.utf8().ok()?))
+    }
+    pub fn supported_languages(&self) -> Option<ScriptLangTags<'_>> {
+        Some(ScriptLangTags(self.data_map(tags::slng)?.utf8().ok()?))
     }
 }
 
@@ -154,7 +154,7 @@ impl<'a> DataMapRecord<'a> {
     pub const fn utf8(&self) -> Result<&'a str, std::str::Utf8Error> {
         str::from_utf8(self.bytes())
     }
-    pub fn utf8_or_bytes(&self) -> Result<&'a str, &'a ByteStr> {
+    pub const fn utf8_or_bytes(&self) -> Result<&'a str, &'a ByteStr> {
         let bytes = ByteStr::new(self.bytes());
         str::from_utf8(bytes).or(Err(bytes))
     }
